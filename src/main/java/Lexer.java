@@ -81,27 +81,81 @@ public class Lexer {
         }
         return new Token(ifno, "", line, pos);
     }
-    Token char_lit(int line, int pos) { // handle character literals
+    Token char_lit(int line, int pos) {
         char c = getNextChar(); // skip opening quote
         int n = (int)c;
-        // code here
+        if (c == '\\') {
+            c = getNextChar();
+            if (c == 'n') n = 10;
+            else if (c == '\\') n = '\\';
+            else error(line, pos, String.format("unrecognized escape sequence \\%c", c));
+        }
+        if (getNextChar() != '\'') {
+            error(line, pos, "multi-character constant");
+        }
+        getNextChar();
         return new Token(TokenType.Integer, "" + n, line, pos);
     }
-    Token string_lit(char start, int line, int pos) { // handle string literals
+
+    Token string_lit(char start, int line, int pos) {
         String result = "";
-        // code here
+        while (getNextChar() != start) {
+            if (this.chr == '\\') {
+                getNextChar();
+                if (this.chr == 'n') result += "\n";
+                else if (this.chr == '\\') result += "\\";
+                else if (this.chr == '"') result += "\"";
+                else error(line, pos, String.format("unrecognized escape sequence \\%c", this.chr));
+            } else if (this.chr == '\u0000') {
+                error(line, pos, "EOF while scanning string literal");
+            } else {
+                result += this.chr;
+            }
+        }
+        getNextChar();
         return new Token(TokenType.String, result, line, pos);
     }
-    Token div_or_comment(int line, int pos) { // handle division or comments
-        // code here
-        return getToken();
+
+    Token div_or_comment(int line, int pos) {
+        if (getNextChar() != '*') {
+            return new Token(TokenType.Op_divide, "", line, pos);
+        }
+        getNextChar();
+        while (true) {
+            if (this.chr == '\u0000') {
+                error(line, pos, "EOF in comment");
+            } else if (this.chr == '*') {
+                if (getNextChar() == '/') {
+                    getNextChar();
+                    return getToken();
+                }
+            } else {
+                getNextChar();
+            }
+        }
     }
-    Token identifier_or_integer(int line, int pos) { // handle identifiers and integers
+
+    Token identifier_or_integer(int line, int pos) {
         boolean is_number = true;
         String text = "";
-        // code here
-        return new Token(TokenType.Identifier, text, line, pos);
+
+        while (Character.isAlphabetic(this.chr) || this.chr == '_' || Character.isDigit(this.chr)) {
+            text += this.chr;
+            if (!Character.isDigit(this.chr)) is_number = false;
+            getNextChar();
+        }
+
+        if (text.isEmpty()) {
+            error(line, pos, String.format("unrecognized character: (%d) '%c'", (int)this.chr, this.chr));
+        } else if (is_number) {
+            return new Token(TokenType.Integer, text, line, pos);
+        } else if (this.keywords.containsKey(text)) {
+            return new Token(this.keywords.get(text), "", line, pos);
+        } else {
+            return new Token(TokenType.Identifier, text, line, pos);
+        }
     }
+
     Token getToken() {
         int line, pos;
         while (Character.isWhitespace(this.chr)) {
@@ -110,16 +164,30 @@ public class Lexer {
         line = this.line;
         pos = this.pos;
 
-        // switch statement on character for all forms of tokens with return to follow.... one example left for you
-
         switch (this.chr) {
             case '\u0000': return new Token(TokenType.End_of_input, "", this.line, this.pos);
-            // remaining case statements
-
+            case '/': return div_or_comment(line, pos);
+            case '\'': return char_lit(line, pos);
+            case '"': return string_lit(this.chr, line, pos);
+            case '(': getNextChar(); return new Token(TokenType.LeftParen, "", line, pos);
+            case ')': getNextChar(); return new Token(TokenType.RightParen, "", line, pos);
+            case '{': getNextChar(); return new Token(TokenType.LeftBrace, "", line, pos);
+            case '}': getNextChar(); return new Token(TokenType.RightBrace, "", line, pos);
+            case ';': getNextChar(); return new Token(TokenType.Semicolon, "", line, pos);
+            case ',': getNextChar(); return new Token(TokenType.Comma, "", line, pos);
+            case '+': getNextChar(); return new Token(TokenType.Op_add, "", line, pos);
+            case '-': getNextChar(); return new Token(TokenType.Op_subtract, "", line, pos);
+            case '*': getNextChar(); return new Token(TokenType.Op_multiply, "", line, pos);
+            case '%': getNextChar(); return new Token(TokenType.Op_mod, "", line, pos);
+            case '&': return follow('&', TokenType.Op_and, TokenType.End_of_input, line, pos);
+            case '|': return follow('|', TokenType.Op_or, TokenType.End_of_input, line, pos);
+            case '=': return follow('=', TokenType.Op_equal, TokenType.Op_assign, line, pos);
+            case '!': return follow('=', TokenType.Op_notequal, TokenType.Op_not, line, pos);
+            case '<': return follow('=', TokenType.Op_lessequal, TokenType.Op_less, line, pos);
+            case '>': return follow('=', TokenType.Op_greaterequal, TokenType.Op_greater, line, pos);
             default: return identifier_or_integer(line, pos);
         }
     }
-
     char getNextChar() {
         this.pos++;
         this.position++;
@@ -183,3 +251,9 @@ public class Lexer {
         }
     }
 }
+
+//let's see if this April 23rd Mycole code works
+
+
+
+
