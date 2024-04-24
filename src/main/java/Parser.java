@@ -146,7 +146,9 @@ class Parser {
         // create nodes for token types such as LeftParen, Op_add, Op_subtract, etc.
         // be very careful here and be aware of the precendence rules for the AST tree
         Node result = null, node;
-
+        if(this.token.tokentype == TokenType.LeftParen){
+            result.value = "(";
+        }
         return result;
     }
     Node paren_expr() {
@@ -166,6 +168,9 @@ class Parser {
         // this one handles TokenTypes such as Keyword_if, Keyword_else, nd_If, Keyword_print, etc.
         // also handles while, end of file, braces
         Node s, s2, t = null, e, v;
+        if(this.token.tokentype == TokenType.Keyword_print){
+            t = paren_expr();
+        }
 
         return t;
     }
