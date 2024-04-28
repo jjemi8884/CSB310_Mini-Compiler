@@ -137,43 +137,190 @@ class Parser {
         this.source = source;
         this.token = null;
         this.position = 0;
+
     }
     Token getNextToken() {
         this.token = this.source.get(this.position++);
         return this.token;
     }
-    Node expr(int p) {
-        // create nodes for token types such as LeftParen, Op_add, Op_subtract, etc.
-        // be very careful here and be aware of the precendence rules for the AST tree
-        Node result = null, node;
-        if(this.token.tokentype == TokenType.LeftParen){
-            result.value = "(";
+    Node stmt() {
+        // this one handles TokenTypes such as Keyword_if, Keyword_else, nd_If, Keyword_print, etc.
+        // also handles while, end of file, braces
+
+        Node s, s1, t = null, e, v;
+        if(this.token.tokentype == TokenType.Semicolon){
+            getNextToken();
+        } else if(this.token.tokentype == TokenType.Identifier){
+            v = Node.make_leaf(this.token.tokentype.node_type, this.token.value);
+            getNextToken();
+            expect("Op_assign", TokenType.Op_assign);
+            NodeType n = this.token.tokentype.node_type;
+            getNextToken();
+            t = Node.make_node(n, v, expr(0));
+            expect(";",TokenType.Semicolon);
+            getNextToken();
+
+        }else if(this.token.tokentype == TokenType.Keyword_while) {
+            getNextToken();
+            e = paren_expr();
+            t = Node.make_node(NodeType.nd_While,e, stmt());
+
+
+        }else if(this.token.tokentype == TokenType.LeftBrace){
+            getNextToken();
+            while(this.token.tokentype != TokenType.RightBrace &&
+                    this.token.tokentype != TokenType.End_of_input) {
+                t = Node.make_node(NodeType.nd_Sequence, t, stmt());
+            }//end while
+            getNextToken();
+
+
+        }else if (this.token.tokentype == TokenType.Keyword_if) {
+            getNextToken();
+            e = paren_expr();
+            s = stmt();
+            Node el = null;
+            if (this.token.tokentype == TokenType.Keyword_else) {
+                el = stmt();
+            }//enf if
+            //Going to make the inner if statement the true
+            //statement and the else statement he left node.
+
+            t = Node.make_node(NodeType.nd_If, e, Node.make_node(NodeType.nd_If, s, el));
+
+        }else if (this.token.tokentype == TokenType.Keyword_print) {
+            getNextToken();
+            expect("(", TokenType.LeftParen);
+            boolean done = false;
+            while(!done){
+
+                getNextToken();
+                Node it = null;
+                if(this.token.tokentype == TokenType.String){
+                    it = Node.make_node(NodeType.nd_Prts,
+                            Node.make_leaf(NodeType.nd_String, this.token.value));
+                    getNextToken();
+                }else{
+                    it = Node.make_node(NodeType.nd_Prti, expr(0));
+                }
+
+                if(this.token.tokentype != TokenType.Comma){
+                    done = true;
+                }
+                //assume that its eather a string, integer, or expr
+                t = Node.make_node(NodeType.nd_Sequence, t, it);
+            }
+
+            expect(")", TokenType.RightParen);
+            getNextToken();
+            expect(";", TokenType.Semicolon);
+            getNextToken();
+
+
+        }else if (this.token.tokentype == TokenType.Keyword_putc) {
+            t = paren_expr();
+            getNextToken();
+            expect(";", TokenType.Semicolon);
+            getNextToken();
+
+        }else if(this.token.tokentype == TokenType.RightBrace){
+            getNextToken();
+        }else if(this.token.tokentype == TokenType.End_of_input){
+            return t;
         }
-        return result;
+
+
+        else{
+            System.out.println("Syntax error: " + this.token.tokentype + " is not in the <stmt> EBNF");
+        }//end if statments
+
+
+        return t;
     }
     Node paren_expr() {
         expect("paren_expr", TokenType.LeftParen);
+        getNextToken();
         Node node = expr(0);
         expect("paren_expr", TokenType.RightParen);
+        getNextToken();
         return node;
     }
+    Node prt_list(){
+        expect("paren_expr", TokenType.LeftParen);
+        getNextToken();
+        Node node = new Node();
+        if(this.token.tokentype == TokenType.String) {
+            node.value = this.token.value;
+        }else{
+            node = expr(0);
+        }//end if
+
+        expect("paren_expr", TokenType.RightParen);
+        expect("Semicolon", TokenType.Semicolon);
+        return node;
+    }
+
+    Node expr(int p) {
+        // create nodes for token types such as LeftParen, Op_add, Op_subtract, etc.
+        // be very careful here and be aware of the precendence rules for the AST tree
+
+        Node result = null, e, v;
+        if(this.token.tokentype.is_binary){
+            NodeType n = this.token.tokentype.node_type;
+            getNextToken(); //set up right child
+            result = Node.make_node(n, null, expr(0));
+
+        }else if(this.token.tokentype == TokenType.Integer){
+            v = Node.make_leaf(NodeType.nd_Integer, this.token.value);
+            getNextToken();
+            if(this.token.tokentype == TokenType.Semicolon || this.token.tokentype == TokenType.RightParen){
+                result = v;
+            }else{
+                result = expr(this.token.tokentype.precedence);
+                result.left = v;
+            }
+
+        } else if(this.token.tokentype == TokenType.Identifier){
+            v = Node.make_leaf(NodeType.nd_Ident, this.token.value);
+            getNextToken();
+            if(this.token.tokentype == TokenType.Semicolon || this.token.tokentype == TokenType.RightParen
+                               || this.token.tokentype == TokenType.Comma){
+                result = v;
+            }else{
+                result = expr(this.token.tokentype.precedence);
+                result.left = v;
+            }
+
+        } else if(this.token.tokentype.is_unary){
+            Token temp = this.token;
+            getNextToken();
+            result = Node.make_node(temp.tokentype.node_type, expr(0),null);
+        } else if(this.token.tokentype == TokenType.LeftParen){
+
+        }
+
+        //check for precedence
+        while(this.token.tokentype.is_binary && this.token.tokentype.precedence >= p){
+            Token temp = this.token;
+            getNextToken();
+            int q = this.token.tokentype.precedence;
+            if (temp.tokentype.isRightAssoc()){
+                q += 1;
+                result = Node.make_node(temp.tokentype.node_type, result, expr(q));
+            }//end if
+        }// end while
+        return result;
+    }
+
     void expect(String msg, TokenType s) {
         if (this.token.tokentype == s) {
-            getNextToken();
+            //getNextToken();
             return;
         }
         error(this.token.line, this.token.pos, msg + ": Expecting '" + s + "', found: '" + this.token.tokentype + "'");
     }
-    Node stmt() {
-        // this one handles TokenTypes such as Keyword_if, Keyword_else, nd_If, Keyword_print, etc.
-        // also handles while, end of file, braces
-        Node s, s2, t = null, e, v;
-        if(this.token.tokentype == TokenType.Keyword_print){
-            t = paren_expr();
-        }
 
-        return t;
-    }
+
     Node parse() {
         Node t = null;
         getNextToken();
@@ -208,7 +355,7 @@ class Parser {
 
     static void outputToFile(String result) {
         try {
-            FileWriter myWriter = new FileWriter("src/main/resources/hello.par");
+            FileWriter myWriter = new FileWriter("src/main/resources/test2.par");
             myWriter.write(result);
             myWriter.close();
             System.out.println("Successfully wrote to the file.");
@@ -246,7 +393,7 @@ class Parser {
         str_to_tokens.put("LeftParen", TokenType.LeftParen);
         str_to_tokens.put("RightParen", TokenType.RightParen);
         str_to_tokens.put("LeftBrace", TokenType.LeftBrace);
-        str_to_tokens.put("RightBrack", TokenType.RightBrace);
+        str_to_tokens.put("RightBrace", TokenType.RightBrace);
         str_to_tokens.put("Semicolon", TokenType.Semicolon);
         str_to_tokens.put("Comma", TokenType.Comma);
         str_to_tokens.put("Identifier", TokenType.Identifier);
@@ -269,7 +416,7 @@ class Parser {
                 List<Token> list = new ArrayList<>();
                 Map<String, TokenType> str_to_tokens =  createHashMap();
 
-                Scanner s = new Scanner(new File("src/main/resources/hello.lex"));
+                Scanner s = new Scanner(new File("src/main/resources/loop.lex"));
                 String source = " ";
                 while (s.hasNext()) {
                     String str = s.nextLine();
@@ -291,7 +438,8 @@ class Parser {
                     }
                 }
                 Parser p = new Parser(list);
-                result = p.printAST(p.parse(), sb);
+                Node parceNode = p.parse();
+                result = p.printAST(parceNode, sb);
                 outputToFile(result);
             } catch (FileNotFoundException e) {
                 error(-1, -1, "Exception: " + e.getMessage());
