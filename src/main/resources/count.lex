@@ -13,7 +13,7 @@
     3      9 LeftParen      
     3     10 String          "count is: "
     3     22 Comma          
-    3     24 Identifier      count
+3     24 Identifier      count
     3     29 Comma          
     3     31 String          "\n"
     3     35 RightParen     

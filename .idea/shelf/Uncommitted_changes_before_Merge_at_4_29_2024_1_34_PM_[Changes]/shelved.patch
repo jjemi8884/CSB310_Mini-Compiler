@@ -1,0 +1,213 @@
+Index: src/main/java/Lexer.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import java.io.File;\r\nimport java.io.FileNotFoundException;\r\nimport java.io.FileWriter;\r\nimport java.io.IOException;\r\nimport java.util.HashMap;\r\nimport java.util.Map;\r\nimport java.util.Scanner;\r\n\r\npublic class Lexer {\r\n    private int line;\r\n    private int pos;\r\n    private int position;\r\n    private char chr;\r\n    private String s;\r\n\r\n    Map<String, TokenType> keywords = new HashMap<>();\r\n\r\n    static class Token {\r\n        public TokenType tokentype;\r\n        public String value;\r\n        public int line;\r\n        public int pos;\r\n        Token(TokenType token, String value, int line, int pos) {\r\n            this.tokentype = token; this.value = value; this.line = line; this.pos = pos;\r\n        }\r\n        @Override\r\n        public String toString() {\r\n            String result = String.format(\"%5d  %5d %-15s\", this.line, this.pos, this.tokentype);\r\n            switch (this.tokentype) {\r\n                case Integer:\r\n                    result += String.format(\"  %4s\", value);\r\n                    break;\r\n                case Identifier:\r\n                    result += String.format(\" %s\", value);\r\n                    break;\r\n                case String:\r\n                    result += String.format(\" \\\"%s\\\"\", value);\r\n                    break;\r\n            }\r\n            return result;\r\n        }\r\n    }\r\n\r\n    static enum TokenType {\r\n        End_of_input, Op_multiply,  Op_divide, Op_mod, Op_add, Op_subtract,\r\n        Op_negate, Op_not, Op_less, Op_lessequal, Op_greater, Op_greaterequal,\r\n        Op_equal, Op_notequal, Op_assign, Op_and, Op_or, Keyword_if,\r\n        Keyword_else, Keyword_while, Keyword_print, Keyword_putc, LeftParen, RightParen,\r\n        LeftBrace, RightBrace, Semicolon, Comma, Identifier, Integer, String\r\n    }\r\n\r\n    static void error(int line, int pos, String msg) {\r\n        if (line > 0 && pos > 0) {\r\n            System.out.printf(\"%s in line %d, pos %d\\n\", msg, line, pos);\r\n        } else {\r\n            System.out.println(msg);\r\n        }\r\n        System.exit(1);\r\n    }\r\n\r\n    Lexer(String source) {\r\n        this.line = 1;\r\n        this.pos = 0;\r\n        this.position = 0;\r\n        this.s = source;\r\n        this.chr = this.s.charAt(0);\r\n        this.keywords.put(\"if\", TokenType.Keyword_if);\r\n        this.keywords.put(\"else\", TokenType.Keyword_else);\r\n        this.keywords.put(\"print\", TokenType.Keyword_print);\r\n        this.keywords.put(\"putc\", TokenType.Keyword_putc);\r\n        this.keywords.put(\"while\", TokenType.Keyword_while);\r\n\r\n    }\r\n    Token follow(char expect, TokenType ifyes, TokenType ifno, int line, int pos) {\r\n        if (getNextChar() == expect) {\r\n            getNextChar();\r\n            return new Token(ifyes, \"\", line, pos);\r\n        }\r\n        if (ifno == TokenType.End_of_input) {\r\n            error(line, pos, String.format(\"follow: unrecognized character: (%d) '%c'\", (int)this.chr, this.chr));\r\n        }\r\n        return new Token(ifno, \"\", line, pos);\r\n    }\r\n    Token char_lit(int line, int pos) { // handle character literals\r\n        char c = getNextChar(); // skip opening quote\r\n        int n = (int)c;\r\n        // code here\r\n        return new Token(TokenType.Integer, \"\" + n, line, pos);\r\n    }\r\n    Token string_lit(char start, int line, int pos) { // handle string literals\r\n        String result = \"\";\r\n        // code here\r\n        return new Token(TokenType.String, result, line, pos);\r\n    }\r\n    Token div_or_comment(int line, int pos) { // handle division or comments\r\n        // code here\r\n        return getToken();\r\n    }\r\n    Token identifier_or_integer(int line, int pos) { // handle identifiers and integers\r\n        boolean is_number = true;\r\n        String text = \"\";\r\n        // code here\r\n        return new Token(TokenType.Identifier, text, line, pos);\r\n    }\r\n    Token getToken() {\r\n        int line, pos;\r\n        while (Character.isWhitespace(this.chr)) {\r\n            getNextChar();\r\n        }\r\n        line = this.line;\r\n        pos = this.pos;\r\n\r\n        // switch statement on character for all forms of tokens with return to follow.... one example left for you\r\n\r\n        switch (this.chr) {\r\n            case '\\u0000': return new Token(TokenType.End_of_input, \"\", this.line, this.pos);\r\n            // remaining case statements\r\n\r\n            default: return identifier_or_integer(line, pos);\r\n        }\r\n    }\r\n\r\n    char getNextChar() {\r\n        this.pos++;\r\n        this.position++;\r\n        if (this.position >= this.s.length()) {\r\n            this.chr = '\\u0000';\r\n            return this.chr;\r\n        }\r\n        this.chr = this.s.charAt(this.position);\r\n        if (this.chr == '\\n') {\r\n            this.line++;\r\n            this.pos = 0;\r\n        }\r\n        return this.chr;\r\n    }\r\n\r\n    String printTokens() {\r\n        Token t;\r\n        StringBuilder sb = new StringBuilder();\r\n        while ((t = getToken()).tokentype != TokenType.End_of_input) {\r\n            sb.append(t);\r\n            sb.append(\"\\n\");\r\n            System.out.println(t);\r\n        }\r\n        sb.append(t);\r\n        System.out.println(t);\r\n        return sb.toString();\r\n    }\r\n\r\n    static void outputToFile(String result) {\r\n        try {\r\n            FileWriter myWriter = new FileWriter(\"src/main/resources/hello.lex\");\r\n            myWriter.write(result);\r\n            myWriter.close();\r\n            System.out.println(\"Successfully wrote to the file.\");\r\n        } catch (IOException e) {\r\n            throw new RuntimeException(e);\r\n        }\r\n    }\r\n\r\n    public static void main(String[] args) {\r\n        if (1==1) {\r\n            try {\r\n\r\n                File f = new File(\"src/main/resources/count.c\");\r\n                Scanner s = new Scanner(f);\r\n                String source = \" \";\r\n                String result = \" \";\r\n                while (s.hasNext()) {\r\n                    source += s.nextLine() + \"\\n\";\r\n                }\r\n                Lexer l = new Lexer(source);\r\n                result = l.printTokens();\r\n\r\n                outputToFile(result);\r\n\r\n            } catch(FileNotFoundException e) {\r\n                error(-1, -1, \"Exception: \" + e.getMessage());\r\n            }\r\n        } else {\r\n            error(-1, -1, \"No args\");\r\n        }\r\n    }\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/Lexer.java b/src/main/java/Lexer.java
+--- a/src/main/java/Lexer.java	(revision dc69f19e5d9b8f1797e7355bde22bae1be1b1d82)
++++ b/src/main/java/Lexer.java	(date 1714197066593)
+@@ -150,7 +150,7 @@
+ 
+     static void outputToFile(String result) {
+         try {
+-            FileWriter myWriter = new FileWriter("src/main/resources/hello.lex");
++            FileWriter myWriter = new FileWriter("src/main/resources/hello1.lex");
+             myWriter.write(result);
+             myWriter.close();
+             System.out.println("Successfully wrote to the file.");
+@@ -163,7 +163,7 @@
+         if (1==1) {
+             try {
+ 
+-                File f = new File("src/main/resources/count.c");
++                File f = new File("src/main/resources/fizzbuzz.c");
+                 Scanner s = new Scanner(f);
+                 String source = " ";
+                 String result = " ";
+Index: src/main/resources/count.lex
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>    1      1 Identifier      count\r\n    1      7 Op_assign      \r\n    1      9 Integer             1\r\n    1     10 Semicolon      \r\n    2      1 Keyword_while  \r\n    2      7 LeftParen      \r\n    2      8 Identifier      count\r\n    2     14 Op_less        \r\n    2     16 Integer            10\r\n    2     18 RightParen     \r\n    2     20 LeftBrace      \r\n    3      4 Keyword_print  \r\n    3      9 LeftParen      \r\n    3     10 String          \"count is: \"\r\n    3     22 Comma          \r\n    3     24 Identifier      count\r\n    3     29 Comma          \r\n    3     31 String          \"\\n\"\r\n    3     35 RightParen     \r\n    3     36 Semicolon      \r\n    4      4 Identifier      count\r\n    4     10 Op_assign      \r\n    4     12 Identifier      count\r\n    4     18 Op_add         \r\n    4     20 Integer             1\r\n    4     21 Semicolon      \r\n    5      1 RightBrace     \r\n    6      1 End_of_input   
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/count.lex b/src/main/resources/count.lex
+--- a/src/main/resources/count.lex	(revision dc69f19e5d9b8f1797e7355bde22bae1be1b1d82)
++++ b/src/main/resources/count.lex	(date 1714324777859)
+@@ -13,7 +13,7 @@
+     3      9 LeftParen      
+     3     10 String          "count is: "
+     3     22 Comma          
+-    3     24 Identifier      count
++3     24 Identifier      count
+     3     29 Comma          
+     3     31 String          "\n"
+     3     35 RightParen     
+Index: src/main/resources/test1.lex
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>1       1 Identifier count\r\n1       7 Op_assign\r\n1       9 Integer       1\r\n1       25 Semicolon\r\n1       1 End_of_input
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/test1.lex b/src/main/resources/test1.lex
+--- a/src/main/resources/test1.lex	(revision dc69f19e5d9b8f1797e7355bde22bae1be1b1d82)
++++ b/src/main/resources/test1.lex	(date 1714285893955)
+@@ -2,4 +2,20 @@
+ 1       7 Op_assign
+ 1       9 Integer       1
+ 1       25 Semicolon
++2       1 Keyword_while
++2       7 LeftParen
++2       8 Identifier    count
++2       14 Op_less
++2       16 Integer      10
++2       18 RightParen
++2       20 LeftBrace
++3       4 Keyword_print
++3       9 LeftParen
++3       10 String       "count is: "
++3       22 Comma
++3       24 Identifier    count
++3       29 Comma
++3       31 String       "\n"
++3       35 RightParen
++3       36 Semicolon
+ 1       1 End_of_input
+\ No newline at end of file
+Index: .idea/workspace.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"AutoImportSettings\">\r\n    <option name=\"autoReloadType\" value=\"SELECTIVE\" />\r\n  </component>\r\n  <component name=\"ChangeListManager\">\r\n    <list default=\"true\" id=\"a7ac25b6-265d-43ed-8230-0c6749f7127e\" name=\"Changes\" comment=\"New commit with added getNextToken() code\">\r\n      <change beforePath=\"$PROJECT_DIR$/.idea/misc.xml\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/.idea/misc.xml\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/.idea/workspace.xml\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/.idea/workspace.xml\" afterDir=\"false\" />\r\n    </list>\r\n    <option name=\"SHOW_DIALOG\" value=\"false\" />\r\n    <option name=\"HIGHLIGHT_CONFLICTS\" value=\"true\" />\r\n    <option name=\"HIGHLIGHT_NON_ACTIVE_CHANGELIST\" value=\"false\" />\r\n    <option name=\"LAST_RESOLUTION\" value=\"IGNORE\" />\r\n  </component>\r\n  <component name=\"ExternalProjectsData\">\r\n    <projectState path=\"$PROJECT_DIR$\">\r\n      <ProjectState />\r\n    </projectState>\r\n  </component>\r\n  <component name=\"ExternalProjectsManager\">\r\n    <system id=\"GRADLE\">\r\n      <state>\r\n        <projects_view>\r\n          <tree_state>\r\n            <expand>\r\n              <path>\r\n                <item name=\"\" type=\"6a2764b6:ExternalProjectsStructure$RootNode\" />\r\n                <item name=\"MiniCompiler\" type=\"f1a62948:ProjectNode\" />\r\n              </path>\r\n            </expand>\r\n            <select />\r\n          </tree_state>\r\n        </projects_view>\r\n      </state>\r\n    </system>\r\n  </component>\r\n  <component name=\"FileTemplateManagerImpl\">\r\n    <option name=\"RECENT_TEMPLATES\">\r\n      <list>\r\n        <option value=\"JUnit5 Test Class\" />\r\n        <option value=\"Class\" />\r\n      </list>\r\n    </option>\r\n  </component>\r\n  <component name=\"Git.Settings\">\r\n    <option name=\"RECENT_BRANCH_BY_REPOSITORY\">\r\n      <map>\r\n        <entry key=\"$PROJECT_DIR$\" value=\"main\" />\r\n      </map>\r\n    </option>\r\n    <option name=\"RECENT_GIT_ROOT_PATH\" value=\"$PROJECT_DIR$\" />\r\n  </component>\r\n  <component name=\"GitHubPullRequestSearchHistory\"><![CDATA[{\r\n  \"lastFilter\": {\r\n    \"state\": \"OPEN\",\r\n    \"assignee\": \"jjemi8884\"\r\n  }\r\n}]]></component>\r\n  <component name=\"GithubPullRequestsUISettings\"><![CDATA[{\r\n  \"selectedUrlAndAccountId\": {\r\n    \"url\": \"https://github.com/jjemi8884/CSB310_Mini-Compiler\",\r\n    \"accountId\": \"e452ae38-d731-4fe8-9029-458a87a7fe7c\"\r\n  }\r\n}]]></component>\r\n  <component name=\"MarkdownSettingsMigration\">\r\n    <option name=\"stateVersion\" value=\"1\" />\r\n  </component>\r\n  <component name=\"ProjectColorInfo\">{\r\n  &quot;associatedIndex&quot;: 7\r\n}</component>\r\n  <component name=\"ProjectId\" id=\"2MfWaxIGvCC8fsmB46pvouU9vkq\" />\r\n  <component name=\"ProjectLevelVcsManager\" settingsEditedManually=\"true\" />\r\n  <component name=\"ProjectViewState\">\r\n    <option name=\"hideEmptyMiddlePackages\" value=\"true\" />\r\n    <option name=\"showLibraryContents\" value=\"true\" />\r\n  </component>\r\n  <component name=\"PropertiesComponent\"><![CDATA[{\r\n  \"keyToString\": {\r\n    \"Gradle.CSB310_Mini-Compiler [:Lexer.main()].executor\": \"Run\",\r\n    \"RunOnceActivity.ShowReadmeOnStart\": \"true\",\r\n    \"SHARE_PROJECT_CONFIGURATION_FILES\": \"true\",\r\n    \"WebServerToolWindowFactoryState\": \"false\",\r\n    \"com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary\": \"JUnit5\",\r\n    \"com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit5\": \"\",\r\n    \"git-widget-placeholder\": \"parcer\",\r\n    \"ignore.virus.scanning.warn.message\": \"true\",\r\n    \"kotlin-language-version-configured\": \"true\",\r\n    \"last_opened_file_path\": \"C:/Users/jjemi/Documents/CSB310/CSB310_Mini-Compiler\",\r\n    \"node.js.detected.package.eslint\": \"true\",\r\n    \"node.js.detected.package.tslint\": \"true\",\r\n    \"node.js.selected.package.eslint\": \"(autodetect)\",\r\n    \"node.js.selected.package.tslint\": \"(autodetect)\",\r\n    \"settings.editor.selected.configurable\": \"reference.settingsdialog.project.gradle\",\r\n    \"vue.rearranger.settings.migration\": \"true\"\r\n  }\r\n}]]></component>\r\n  <component name=\"RecentsManager\">\r\n    <key name=\"CopyFile.RECENT_KEYS\">\r\n      <recent name=\"$PROJECT_DIR$/src/main/resources\" />\r\n    </key>\r\n    <key name=\"MoveFile.RECENT_KEYS\">\r\n      <recent name=\"$PROJECT_DIR$/src/main/resources\" />\r\n    </key>\r\n    <key name=\"CreateTestDialog.Recents.Supers\">\r\n      <recent name=\"\" />\r\n    </key>\r\n    <key name=\"CreateTestDialog.RecentsKey\">\r\n      <recent name=\"\" />\r\n    </key>\r\n  </component>\r\n  <component name=\"RunManager\" selected=\"Application.Lexer\">\r\n    <configuration name=\"Lexer\" type=\"Application\" factoryName=\"Application\" temporary=\"true\" nameIsGenerated=\"true\">\r\n      <option name=\"MAIN_CLASS_NAME\" value=\"Lexer\" />\r\n      <module name=\"MiniCompiler.main\" />\r\n      <method v=\"2\">\r\n        <option name=\"Make\" enabled=\"true\" />\r\n      </method>\r\n    </configuration>\r\n    <configuration name=\"Parser\" type=\"Application\" factoryName=\"Application\" temporary=\"true\" nameIsGenerated=\"true\">\r\n      <option name=\"MAIN_CLASS_NAME\" value=\"Parser\" />\r\n      <module name=\"MiniCompiler.main\" />\r\n      <method v=\"2\">\r\n        <option name=\"Make\" enabled=\"true\" />\r\n      </method>\r\n    </configuration>\r\n    <recent_temporary>\r\n      <list>\r\n        <item itemvalue=\"Application.Parser\" />\r\n        <item itemvalue=\"Application.Lexer\" />\r\n      </list>\r\n    </recent_temporary>\r\n  </component>\r\n  <component name=\"SpellCheckerSettings\" RuntimeDictionaries=\"0\" Folders=\"0\" CustomDictionaries=\"0\" DefaultDictionary=\"application-level\" UseSingleDictionary=\"true\" transferred=\"true\" />\r\n  <component name=\"TaskManager\">\r\n    <task active=\"true\" id=\"Default\" summary=\"Default task\">\r\n      <changelist id=\"a7ac25b6-265d-43ed-8230-0c6749f7127e\" name=\"Changes\" comment=\"\" />\r\n      <created>1678159185811</created>\r\n      <option name=\"number\" value=\"Default\" />\r\n      <option name=\"presentableId\" value=\"Default\" />\r\n      <updated>1678159185811</updated>\r\n      <workItem from=\"1682634037926\" duration=\"218000\" />\r\n      <workItem from=\"1683141564295\" duration=\"383000\" />\r\n      <workItem from=\"1712181068433\" duration=\"206000\" />\r\n    </task>\r\n    <task id=\"LOCAL-00001\" summary=\"Initial commit, incomplete solution\">\r\n      <created>1678238319702</created>\r\n      <option name=\"number\" value=\"00001\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00001\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1678238319702</updated>\r\n    </task>\r\n    <task id=\"LOCAL-00002\" summary=\"New commit with added getNextToken() code\">\r\n      <created>1682631009218</created>\r\n      <option name=\"number\" value=\"00002\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00002\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1682631009218</updated>\r\n    </task>\r\n    <option name=\"localTasksCounter\" value=\"3\" />\r\n    <servers />\r\n  </component>\r\n  <component name=\"TypeScriptGeneratedFilesManager\">\r\n    <option name=\"version\" value=\"3\" />\r\n  </component>\r\n  <component name=\"Vcs.Log.Tabs.Properties\">\r\n    <option name=\"TAB_STATES\">\r\n      <map>\r\n        <entry key=\"MAIN\">\r\n          <value>\r\n            <State>\r\n              <option name=\"FILTERS\">\r\n                <map>\r\n                  <entry key=\"branch\">\r\n                    <value>\r\n                      <list>\r\n                        <option value=\"origin/parcer\" />\r\n                      </list>\r\n                    </value>\r\n                  </entry>\r\n                </map>\r\n              </option>\r\n            </State>\r\n          </value>\r\n        </entry>\r\n      </map>\r\n    </option>\r\n  </component>\r\n  <component name=\"VcsManagerConfiguration\">\r\n    <MESSAGE value=\"Initial commit, incomplete solution\" />\r\n    <MESSAGE value=\"New commit with added getNextToken() code\" />\r\n    <option name=\"LAST_COMMIT_MESSAGE\" value=\"New commit with added getNextToken() code\" />\r\n  </component>\r\n  <component name=\"XDebuggerManager\">\r\n    <breakpoint-manager>\r\n      <breakpoints>\r\n        <line-breakpoint enabled=\"true\" type=\"java-field\">\r\n          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>\r\n          <line>17</line>\r\n          <properties field=\"nt\" class=\"Parser.Node\" />\r\n          <option name=\"timeStamp\" value=\"1\" />\r\n        </line-breakpoint>\r\n        <line-breakpoint enabled=\"true\" type=\"java-field\">\r\n          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>\r\n          <line>45</line>\r\n          <properties field=\"tokentype\" class=\"Parser.Token\" />\r\n          <option name=\"timeStamp\" value=\"2\" />\r\n        </line-breakpoint>\r\n        <line-breakpoint enabled=\"true\" type=\"java-field\">\r\n          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>\r\n          <line>112</line>\r\n          <properties field=\"nd_None\" class=\"Parser.NodeType\" />\r\n          <option name=\"timeStamp\" value=\"7\" />\r\n        </line-breakpoint>\r\n        <line-breakpoint enabled=\"true\" type=\"java-line\">\r\n          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>\r\n          <line>59</line>\r\n          <option name=\"timeStamp\" value=\"9\" />\r\n        </line-breakpoint>\r\n      </breakpoints>\r\n    </breakpoint-manager>\r\n    <pin-to-top-manager>\r\n      <pinned-members>\r\n        <PinnedItemInfo parentTag=\"Lexer\" memberName=\"position\" />\r\n      </pinned-members>\r\n    </pin-to-top-manager>\r\n  </component>\r\n  <component name=\"XSLT-Support.FileAssociations.UIState\">\r\n    <expand />\r\n    <select />\r\n  </component>\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+--- a/.idea/workspace.xml	(revision dc69f19e5d9b8f1797e7355bde22bae1be1b1d82)
++++ b/.idea/workspace.xml	(date 1714422318026)
+@@ -5,8 +5,10 @@
+   </component>
+   <component name="ChangeListManager">
+     <list default="true" id="a7ac25b6-265d-43ed-8230-0c6749f7127e" name="Changes" comment="New commit with added getNextToken() code">
+-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/src/main/java/Lexer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Lexer.java" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/src/main/resources/count.lex" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/count.lex" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/src/main/resources/test1.lex" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/test1.lex" afterDir="false" />
+     </list>
+     <option name="SHOW_DIALOG" value="false" />
+     <option name="HIGHLIGHT_CONFLICTS" value="true" />
+@@ -51,18 +53,18 @@
+     </option>
+     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+   </component>
+-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+-  "lastFilter": {
+-    "state": "OPEN",
+-    "assignee": "jjemi8884"
++  <component name="GitHubPullRequestSearchHistory">{
++  &quot;lastFilter&quot;: {
++    &quot;state&quot;: &quot;OPEN&quot;,
++    &quot;assignee&quot;: &quot;jjemi8884&quot;
+   }
+-}]]></component>
+-  <component name="GithubPullRequestsUISettings"><![CDATA[{
+-  "selectedUrlAndAccountId": {
+-    "url": "https://github.com/jjemi8884/CSB310_Mini-Compiler",
+-    "accountId": "e452ae38-d731-4fe8-9029-458a87a7fe7c"
++}</component>
++  <component name="GithubPullRequestsUISettings">{
++  &quot;selectedUrlAndAccountId&quot;: {
++    &quot;url&quot;: &quot;https://github.com/jjemi8884/CSB310_Mini-Compiler&quot;,
++    &quot;accountId&quot;: &quot;e452ae38-d731-4fe8-9029-458a87a7fe7c&quot;
+   }
+-}]]></component>
++}</component>
+   <component name="MarkdownSettingsMigration">
+     <option name="stateVersion" value="1" />
+   </component>
+@@ -70,7 +72,9 @@
+   &quot;associatedIndex&quot;: 7
+ }</component>
+   <component name="ProjectId" id="2MfWaxIGvCC8fsmB46pvouU9vkq" />
+-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
++  <component name="ProjectLevelVcsManager" settingsEditedManually="true">
++    <ConfirmationsSetting value="1" id="Add" />
++  </component>
+   <component name="ProjectViewState">
+     <option name="hideEmptyMiddlePackages" value="true" />
+     <option name="showLibraryContents" value="true" />
+@@ -91,6 +95,7 @@
+     "node.js.detected.package.tslint": "true",
+     "node.js.selected.package.eslint": "(autodetect)",
+     "node.js.selected.package.tslint": "(autodetect)",
++    "nodejs_package_manager_path": "npm",
+     "settings.editor.selected.configurable": "reference.settingsdialog.project.gradle",
+     "vue.rearranger.settings.migration": "true"
+   }
+@@ -100,6 +105,7 @@
+       <recent name="$PROJECT_DIR$/src/main/resources" />
+     </key>
+     <key name="MoveFile.RECENT_KEYS">
++      <recent name="C:\Users\jjemi\Documents\CS310\The Compiler\CSB310_Mini-Compiler\src\main\resources" />
+       <recent name="$PROJECT_DIR$/src/main/resources" />
+     </key>
+     <key name="CreateTestDialog.Recents.Supers">
+@@ -142,6 +148,7 @@
+       <workItem from="1682634037926" duration="218000" />
+       <workItem from="1683141564295" duration="383000" />
+       <workItem from="1712181068433" duration="206000" />
++      <workItem from="1714161863839" duration="48282000" />
+     </task>
+     <task id="LOCAL-00001" summary="Initial commit, incomplete solution">
+       <created>1678238319702</created>
+@@ -192,36 +199,11 @@
+     <option name="LAST_COMMIT_MESSAGE" value="New commit with added getNextToken() code" />
+   </component>
+   <component name="XDebuggerManager">
+-    <breakpoint-manager>
+-      <breakpoints>
+-        <line-breakpoint enabled="true" type="java-field">
+-          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>
+-          <line>17</line>
+-          <properties field="nt" class="Parser.Node" />
+-          <option name="timeStamp" value="1" />
+-        </line-breakpoint>
+-        <line-breakpoint enabled="true" type="java-field">
+-          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>
+-          <line>45</line>
+-          <properties field="tokentype" class="Parser.Token" />
+-          <option name="timeStamp" value="2" />
+-        </line-breakpoint>
+-        <line-breakpoint enabled="true" type="java-field">
+-          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>
+-          <line>112</line>
+-          <properties field="nd_None" class="Parser.NodeType" />
+-          <option name="timeStamp" value="7" />
+-        </line-breakpoint>
+-        <line-breakpoint enabled="true" type="java-line">
+-          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>
+-          <line>59</line>
+-          <option name="timeStamp" value="9" />
+-        </line-breakpoint>
+-      </breakpoints>
+-    </breakpoint-manager>
+     <pin-to-top-manager>
+       <pinned-members>
++        <PinnedItemInfo parentTag="Parser$Node" memberName="right" />
+         <PinnedItemInfo parentTag="Lexer" memberName="position" />
++        <PinnedItemInfo parentTag="Parser$Node" memberName="left" />
+       </pinned-members>
+     </pin-to-top-manager>
+   </component>
+@@ -229,4 +211,7 @@
+     <expand />
+     <select />
+   </component>
++  <component name="com.intellij.coverage.CoverageDataManagerImpl">
++    <SUITE FILE_PATH="coverage/MiniCompiler$Parser.ic" NAME="Parser Coverage Results" MODIFIED="1713465400802" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" />
++  </component>
+ </project>
+\ No newline at end of file

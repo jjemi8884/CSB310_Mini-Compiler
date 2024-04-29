@@ -1,0 +1,363 @@
+Index: src/main/java/Parser.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import java.io.File;\r\nimport java.io.FileNotFoundException;\r\nimport java.io.FileWriter;\r\nimport java.io.IOException;\r\nimport java.util.Scanner;\r\nimport java.util.StringTokenizer;\r\nimport java.util.List;\r\nimport java.util.ArrayList;\r\nimport java.util.Map;\r\nimport java.util.HashMap;\r\n\r\nclass Parser {\r\n    private List<Token> source;\r\n    private Token token;\r\n    private int position;\r\n\r\n    static class Node {\r\n        public NodeType nt;\r\n        public Node left, right;\r\n        public String value;\r\n\r\n        Node() {\r\n            this.nt = null;\r\n            this.left = null;\r\n            this.right = null;\r\n            this.value = null;\r\n        }\r\n        Node(NodeType node_type, Node left, Node right, String value) {\r\n            this.nt = node_type;\r\n            this.left = left;\r\n            this.right = right;\r\n            this.value = value;\r\n        }\r\n        public static Node make_node(NodeType nodetype, Node left, Node right) {\r\n            return new Node(nodetype, left, right, \"\");\r\n        }\r\n        public static Node make_node(NodeType nodetype, Node left) {\r\n            return new Node(nodetype, left, null, \"\");\r\n        }\r\n        public static Node make_leaf(NodeType nodetype, String value) {\r\n            return new Node(nodetype, null, null, value);\r\n        }\r\n    }\r\n\r\n    static class Token {\r\n        public TokenType tokentype;\r\n        public String value;\r\n        public int line;\r\n        public int pos;\r\n\r\n        Token(TokenType token, String value, int line, int pos) {\r\n            this.tokentype = token; this.value = value; this.line = line; this.pos = pos;\r\n        }\r\n        @Override\r\n        public String toString() {\r\n            return String.format(\"%5d  %5d %-15s %s\", this.line, this.pos, this.tokentype, this.value);\r\n        }\r\n    }\r\n\r\n    static enum TokenType {\r\n        End_of_input(false, false, false, -1, NodeType.nd_None),\r\n        Op_multiply(false, true, false, 13, NodeType.nd_Mul),\r\n        Op_divide(false, true, false, 13, NodeType.nd_Div),\r\n        Op_mod(false, true, false, 13, NodeType.nd_Mod),\r\n        Op_add(false, true, false, 12, NodeType.nd_Add),\r\n        Op_subtract(false, true, false, 12, NodeType.nd_Sub),\r\n        Op_negate(false, false, true, 14, NodeType.nd_Negate),\r\n        Op_not(false, false, true, 14, NodeType.nd_Not),\r\n        Op_less(false, true, false, 10, NodeType.nd_Lss),\r\n        Op_lessequal(false, true, false, 10, NodeType.nd_Leq),\r\n        Op_greater(false, true, false, 10, NodeType.nd_Gtr),\r\n        Op_greaterequal(false, true, false, 10, NodeType.nd_Geq),\r\n        Op_equal(false, true, true, 9, NodeType.nd_Eql),\r\n        Op_notequal(false, true, false, 9, NodeType.nd_Neq),\r\n        Op_assign(false, false, false, -1, NodeType.nd_Assign),\r\n        Op_and(false, true, false, 5, NodeType.nd_And),\r\n        Op_or(false, true, false, 4, NodeType.nd_Or),\r\n        Keyword_if(false, false, false, -1, NodeType.nd_If),\r\n        Keyword_else(false, false, false, -1, NodeType.nd_None),\r\n        Keyword_while(false, false, false, -1, NodeType.nd_While),\r\n        Keyword_print(false, false, false, -1, NodeType.nd_None),\r\n        Keyword_putc(false, false, false, -1, NodeType.nd_None),\r\n        LeftParen(false, false, false, -1, NodeType.nd_None),\r\n        RightParen(false, false, false, -1, NodeType.nd_None),\r\n        LeftBrace(false, false, false, -1, NodeType.nd_None),\r\n        RightBrace(false, false, false, -1, NodeType.nd_None),\r\n        Semicolon(false, false, false, -1, NodeType.nd_None),\r\n        Comma(false, false, false, -1, NodeType.nd_None),\r\n        Identifier(false, false, false, -1, NodeType.nd_Ident),\r\n        Integer(false, false, false, -1, NodeType.nd_Integer),\r\n        String(false, false, false, -1, NodeType.nd_String);\r\n\r\n        private final int precedence;\r\n        private final boolean right_assoc;\r\n        private final boolean is_binary;\r\n        private final boolean is_unary;\r\n        private final NodeType node_type;\r\n\r\n        TokenType(boolean right_assoc, boolean is_binary, boolean is_unary, int precedence, NodeType node) {\r\n            this.right_assoc = right_assoc;\r\n            this.is_binary = is_binary;\r\n            this.is_unary = is_unary;\r\n            this.precedence = precedence;\r\n            this.node_type = node;\r\n        }\r\n        boolean isRightAssoc() { return this.right_assoc; }\r\n        boolean isBinary() { return this.is_binary; }\r\n        boolean isUnary() { return this.is_unary; }\r\n        int getPrecedence() { return this.precedence; }\r\n        NodeType getNodeType() { return this.node_type; }\r\n    }\r\n    static enum NodeType {\r\n        nd_None(\"\"), nd_Ident(\"Identifier\"), nd_String(\"String\"), nd_Integer(\"Integer\"), nd_Sequence(\"Sequence\"), nd_If(\"If\"),\r\n        nd_Prtc(\"Prtc\"), nd_Prts(\"Prts\"), nd_Prti(\"Prti\"), nd_While(\"While\"),\r\n        nd_Assign(\"Assign\"), nd_Negate(\"Negate\"), nd_Not(\"Not\"), nd_Mul(\"Multiply\"), nd_Div(\"Divide\"), nd_Mod(\"Mod\"), nd_Add(\"Add\"),\r\n        nd_Sub(\"Subtract\"), nd_Lss(\"Less\"), nd_Leq(\"LessEqual\"),\r\n        nd_Gtr(\"Greater\"), nd_Geq(\"GreaterEqual\"), nd_Eql(\"Equal\"), nd_Neq(\"NotEqual\"), nd_And(\"And\"), nd_Or(\"Or\");\r\n\r\n        private final String name;\r\n\r\n        NodeType(String name) {\r\n            this.name = name;\r\n        }\r\n\r\n        @Override\r\n        public String toString() { return this.name; }\r\n    }\r\n    static void error(int line, int pos, String msg) {\r\n        if (line > 0 && pos > 0) {\r\n            System.out.printf(\"%s in line %d, pos %d\\n\", msg, line, pos);\r\n        } else {\r\n            System.out.println(msg);\r\n        }\r\n        System.exit(1);\r\n    }\r\n    Parser(List<Token> source) {\r\n        this.source = source;\r\n        this.token = null;\r\n        this.position = 0;\r\n    }\r\n    Token getNextToken() {\r\n        this.token = this.source.get(this.position++);\r\n        return this.token;\r\n    }\r\n    Node expr(int p) {\r\n        // create nodes for token types such as LeftParen, Op_add, Op_subtract, etc.\r\n        // be very careful here and be aware of the precendence rules for the AST tree\r\n        Node result = null, node;\r\n\r\n        return result;\r\n    }\r\n    Node paren_expr() {\r\n        expect(\"paren_expr\", TokenType.LeftParen);\r\n        Node node = expr(0);\r\n        expect(\"paren_expr\", TokenType.RightParen);\r\n        return node;\r\n    }\r\n    void expect(String msg, TokenType s) {\r\n        if (this.token.tokentype == s) {\r\n            getNextToken();\r\n            return;\r\n        }\r\n        error(this.token.line, this.token.pos, msg + \": Expecting '\" + s + \"', found: '\" + this.token.tokentype + \"'\");\r\n    }\r\n    Node stmt() {\r\n        // this one handles TokenTypes such as Keyword_if, Keyword_else, nd_If, Keyword_print, etc.\r\n        // also handles while, end of file, braces\r\n        Node s, s2, t = null, e, v;\r\n\r\n        return t;\r\n    }\r\n    Node parse() {\r\n        Node t = null;\r\n        getNextToken();\r\n        while (this.token.tokentype != TokenType.End_of_input) {\r\n            t = Node.make_node(NodeType.nd_Sequence, t, stmt());\r\n        }\r\n        return t;\r\n    }\r\n    String printAST(Node t, StringBuilder sb) {\r\n        int i = 0;\r\n        if (t == null) {\r\n            sb.append(\";\");\r\n            sb.append(\"\\n\");\r\n            System.out.println(\";\");\r\n        } else {\r\n            sb.append(t.nt);\r\n            System.out.printf(\"%-14s\", t.nt);\r\n            if (t.nt == NodeType.nd_Ident || t.nt == NodeType.nd_Integer || t.nt == NodeType.nd_String) {\r\n                sb.append(\" \" + t.value);\r\n                sb.append(\"\\n\");\r\n                System.out.println(\" \" + t.value);\r\n            } else {\r\n                sb.append(\"\\n\");\r\n                System.out.println();\r\n                printAST(t.left, sb);\r\n                printAST(t.right, sb);\r\n            }\r\n\r\n        }\r\n        return sb.toString();\r\n    }\r\n\r\n    static void outputToFile(String result) {\r\n        try {\r\n            FileWriter myWriter = new FileWriter(\"src/main/resources/hello.par\");\r\n            myWriter.write(result);\r\n            myWriter.close();\r\n            System.out.println(\"Successfully wrote to the file.\");\r\n        } catch (IOException e) {\r\n            throw new RuntimeException(e);\r\n        }\r\n    }\r\n\r\n    static Map<String, TokenType> createHashMap(){\r\n        Map<String, TokenType> str_to_tokens = new HashMap<>();\r\n\r\n        //add tokens to map\r\n        str_to_tokens.put(\"End_of_input\", TokenType.End_of_input);\r\n        str_to_tokens.put(\"Op_multiply\", TokenType.Op_multiply);\r\n        str_to_tokens.put(\"Op_divide\", TokenType.Op_divide);\r\n        str_to_tokens.put(\"Op_mod\", TokenType.Op_mod);\r\n        str_to_tokens.put(\"Op_add\", TokenType.Op_add);\r\n        str_to_tokens.put(\"Op_subtract\", TokenType.Op_subtract);\r\n        str_to_tokens.put(\"Op_negate\", TokenType.Op_negate);\r\n        str_to_tokens.put(\"Op_not\", TokenType.Op_not);\r\n        str_to_tokens.put(\"Op_less\", TokenType.Op_less);\r\n        str_to_tokens.put(\"Op_lessequal\", TokenType.Op_lessequal);\r\n        str_to_tokens.put(\"Op_greater\", TokenType.Op_greater);\r\n        str_to_tokens.put(\"Op_greaterequal\", TokenType.Op_greaterequal);\r\n        str_to_tokens.put(\"Op_equal\", TokenType.Op_equal);\r\n        str_to_tokens.put(\"Op_notequal\", TokenType.Op_notequal);\r\n        str_to_tokens.put(\"Op_assign\", TokenType.Op_assign);\r\n        str_to_tokens.put(\"Op_and\", TokenType.Op_and);\r\n        str_to_tokens.put(\"Op_or\", TokenType.Op_or);\r\n        str_to_tokens.put(\"Keyword_if\", TokenType.Keyword_if);\r\n        str_to_tokens.put(\"Keyword_else\", TokenType.Keyword_else);\r\n        str_to_tokens.put(\"Keyword_while\", TokenType.Keyword_while);\r\n        str_to_tokens.put(\"Keyword_print\", TokenType.Keyword_print);\r\n        str_to_tokens.put(\"Keyword_putc\", TokenType.Keyword_putc);\r\n        str_to_tokens.put(\"LeftParen\", TokenType.LeftParen);\r\n        str_to_tokens.put(\"RightParen\", TokenType.RightParen);\r\n        str_to_tokens.put(\"LeftBrace\", TokenType.LeftBrace);\r\n        str_to_tokens.put(\"RightBrack\", TokenType.RightBrace);\r\n        str_to_tokens.put(\"Semicolon\", TokenType.Semicolon);\r\n        str_to_tokens.put(\"Comma\", TokenType.Comma);\r\n        str_to_tokens.put(\"Identifier\", TokenType.Identifier);\r\n        str_to_tokens.put(\"Integer\", TokenType.Integer);\r\n        str_to_tokens.put(\"String\", TokenType.String);\r\n\r\n        return str_to_tokens;\r\n    }//end createMap\r\n\r\n\r\n    public static void main(String[] args) {\r\n        if (1==1) {\r\n            try {\r\n                String value, token;\r\n                String result = \" \";\r\n                StringBuilder sb = new StringBuilder();\r\n                int line, pos;\r\n                Token t;\r\n                boolean found;\r\n                List<Token> list = new ArrayList<>();\r\n                Map<String, TokenType> str_to_tokens =  createHashMap();\r\n\r\n                Scanner s = new Scanner(new File(\"src/main/resources/hello.lex\"));\r\n                String source = \" \";\r\n                while (s.hasNext()) {\r\n                    String str = s.nextLine();\r\n                    StringTokenizer st = new StringTokenizer(str);\r\n                    line = Integer.parseInt(st.nextToken());\r\n                    pos = Integer.parseInt(st.nextToken());\r\n                    token = st.nextToken();\r\n                    value = \"\";\r\n                    while (st.hasMoreTokens()) {\r\n                        value += st.nextToken() + \" \";\r\n                    }\r\n                    found = false;\r\n                    if (str_to_tokens.containsKey(token)) {\r\n                        found = true;\r\n                        list.add(new Token(str_to_tokens.get(token), value, line, pos));\r\n                    }\r\n                    if (found == false) {\r\n                        throw new Exception(\"Token not found: '\" + token + \"'\");\r\n                    }\r\n                }\r\n                Parser p = new Parser(list);\r\n                result = p.printAST(p.parse(), sb);\r\n                outputToFile(result);\r\n            } catch (FileNotFoundException e) {\r\n                error(-1, -1, \"Exception: \" + e.getMessage());\r\n            } catch (Exception e) {\r\n                error(-1, -1, \"Exception: \" + e.getMessage());\r\n            }\r\n        } else {\r\n            error(-1, -1, \"No args\");\r\n        }\r\n    }\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/Parser.java b/src/main/java/Parser.java
+--- a/src/main/java/Parser.java	(revision 219c673ced497d4f759d1bff44dba2ba19356241)
++++ b/src/main/java/Parser.java	(date 1714196942967)
+@@ -137,17 +137,68 @@
+         this.source = source;
+         this.token = null;
+         this.position = 0;
++
+     }
+     Token getNextToken() {
+         this.token = this.source.get(this.position++);
+         return this.token;
+     }
+-    Node expr(int p) {
+-        // create nodes for token types such as LeftParen, Op_add, Op_subtract, etc.
+-        // be very careful here and be aware of the precendence rules for the AST tree
+-        Node result = null, node;
++    Node stmt() {
++        // this one handles TokenTypes such as Keyword_if, Keyword_else, nd_If, Keyword_print, etc.
++        // also handles while, end of file, braces
++
++        Node t = null;
++        if(this.token.tokentype == TokenType.Semicolon){
++            getNextToken();
++        } else if(this.token.tokentype == TokenType.Identifier) {
++            Node left = Node.make_leaf(NodeType.nd_Ident, this.token.value);
++            getNextToken();
++            expect("Op_assign", TokenType.Op_assign);
++            getNextToken();
++            t = Node.make_node(NodeType.nd_Assign, left, expr(0));
++            expect(";", TokenType.Semicolon);
++            getNextToken();
+ 
+-        return result;
++        }else if (this.token.tokentype == TokenType.Keyword_while) {
++            Node e = paren_expr();
++            t = Node.make_node(NodeType.nd_While,e, stmt());
++
++        }else if (this.token.tokentype == TokenType.Keyword_if) {
++            Node e = paren_expr();
++            Node s = stmt();
++            Node el = null;
++
++            t = Node.make_node(NodeType.nd_If,e,Node.make_node(NodeType.nd_If,s,null));
++        }else if (this.token.tokentype == TokenType.Keyword_print) {
++            getNextToken();
++            expect("(", TokenType.LeftParen);
++            do{
++                Node innerExpr = null;
++                getNextToken();
++                if(this.token.tokentype == TokenType.String){
++                    innerExpr = Node.make_node(NodeType.nd_Prts,
++                            Node.make_leaf(NodeType.nd_String, this.token.value));
++                }else{
++                    innerExpr = Node.make_node(NodeType.nd_Prti, expr(0));
++                }
++                t = Node.make_node(NodeType.nd_Sequence, null, innerExpr);
++            }while (this.token.value.equals(','));
++            getNextToken();
++            expect(")", TokenType.RightParen);
++            getNextToken();
++            expect(";", TokenType.Semicolon);
++            getNextToken();
++            return t;
++        }else if (this.token.tokentype == TokenType.Keyword_putc) {
++            //do more things
++        }else if (this.token.tokentype == TokenType.LeftBrace){
++            // another stmt_list
++        }else{
++            System.out.println("Syntax error: " + this.token.tokentype + " is not in the <stmt> EBNF");
++        }//end if statments
++
++
++        return t;
+     }
+     Node paren_expr() {
+         expect("paren_expr", TokenType.LeftParen);
+@@ -155,20 +206,55 @@
+         expect("paren_expr", TokenType.RightParen);
+         return node;
+     }
++    Node prt_list(){
++        expect("paren_expr", TokenType.LeftParen);
++        getNextToken();
++        Node node = new Node();
++        if(this.token.tokentype == TokenType.String) {
++            node.value = this.token.value;
++        }else{
++            node = expr(0);
++        }//end if
++
++        expect("paren_expr", TokenType.RightParen);
++        expect("Semicolon", TokenType.Semicolon);
++        return node;
++    }
++    Node expr(int p) {
++        // create nodes for token types such as LeftParen, Op_add, Op_subtract, etc.
++        // be very careful here and be aware of the precendence rules for the AST tree
++
++        Node result = null;
++
++        if(this.token.tokentype == TokenType.LeftParen){
++            result = paren_expr();
++        }else if(this.token.tokentype == TokenType.Op_add){
++
++        } else if (this.token.tokentype == TokenType.Op_subtract ){
++
++        } else if(this.token.tokentype == TokenType.Integer){
++            result = Node.make_leaf(NodeType.nd_Integer, this.token.value);
++            getNextToken();
++        }
++
++        return result;
++    }
++
++    Node primary(int p) {
++        //create the primary for interger and identifiers
++        //
++        return null;
++    }
++
+     void expect(String msg, TokenType s) {
+         if (this.token.tokentype == s) {
+-            getNextToken();
++            //getNextToken();
+             return;
+         }
+         error(this.token.line, this.token.pos, msg + ": Expecting '" + s + "', found: '" + this.token.tokentype + "'");
+     }
+-    Node stmt() {
+-        // this one handles TokenTypes such as Keyword_if, Keyword_else, nd_If, Keyword_print, etc.
+-        // also handles while, end of file, braces
+-        Node s, s2, t = null, e, v;
+ 
+-        return t;
+-    }
++
+     Node parse() {
+         Node t = null;
+         getNextToken();
+@@ -203,7 +289,7 @@
+ 
+     static void outputToFile(String result) {
+         try {
+-            FileWriter myWriter = new FileWriter("src/main/resources/hello.par");
++            FileWriter myWriter = new FileWriter("src/main/resources/test1.par");
+             myWriter.write(result);
+             myWriter.close();
+             System.out.println("Successfully wrote to the file.");
+@@ -286,7 +372,8 @@
+                     }
+                 }
+                 Parser p = new Parser(list);
+-                result = p.printAST(p.parse(), sb);
++                Node parceNode = p.parse();
++                result = p.printAST(parceNode, sb);
+                 outputToFile(result);
+             } catch (FileNotFoundException e) {
+                 error(-1, -1, "Exception: " + e.getMessage());
+Index: src/main/java/Lexer.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import java.io.File;\r\nimport java.io.FileNotFoundException;\r\nimport java.io.FileWriter;\r\nimport java.io.IOException;\r\nimport java.util.HashMap;\r\nimport java.util.Map;\r\nimport java.util.Scanner;\r\n\r\npublic class Lexer {\r\n    private int line;\r\n    private int pos;\r\n    private int position;\r\n    private char chr;\r\n    private String s;\r\n\r\n    Map<String, TokenType> keywords = new HashMap<>();\r\n\r\n    static class Token {\r\n        public TokenType tokentype;\r\n        public String value;\r\n        public int line;\r\n        public int pos;\r\n        Token(TokenType token, String value, int line, int pos) {\r\n            this.tokentype = token; this.value = value; this.line = line; this.pos = pos;\r\n        }\r\n        @Override\r\n        public String toString() {\r\n            String result = String.format(\"%5d  %5d %-15s\", this.line, this.pos, this.tokentype);\r\n            switch (this.tokentype) {\r\n                case Integer:\r\n                    result += String.format(\"  %4s\", value);\r\n                    break;\r\n                case Identifier:\r\n                    result += String.format(\" %s\", value);\r\n                    break;\r\n                case String:\r\n                    result += String.format(\" \\\"%s\\\"\", value);\r\n                    break;\r\n            }\r\n            return result;\r\n        }\r\n    }\r\n\r\n    static enum TokenType {\r\n        End_of_input, Op_multiply,  Op_divide, Op_mod, Op_add, Op_subtract,\r\n        Op_negate, Op_not, Op_less, Op_lessequal, Op_greater, Op_greaterequal,\r\n        Op_equal, Op_notequal, Op_assign, Op_and, Op_or, Keyword_if,\r\n        Keyword_else, Keyword_while, Keyword_print, Keyword_putc, LeftParen, RightParen,\r\n        LeftBrace, RightBrace, Semicolon, Comma, Identifier, Integer, String\r\n    }\r\n\r\n    static void error(int line, int pos, String msg) {\r\n        if (line > 0 && pos > 0) {\r\n            System.out.printf(\"%s in line %d, pos %d\\n\", msg, line, pos);\r\n        } else {\r\n            System.out.println(msg);\r\n        }\r\n        System.exit(1);\r\n    }\r\n\r\n    Lexer(String source) {\r\n        this.line = 1;\r\n        this.pos = 0;\r\n        this.position = 0;\r\n        this.s = source;\r\n        this.chr = this.s.charAt(0);\r\n        this.keywords.put(\"if\", TokenType.Keyword_if);\r\n        this.keywords.put(\"else\", TokenType.Keyword_else);\r\n        this.keywords.put(\"print\", TokenType.Keyword_print);\r\n        this.keywords.put(\"putc\", TokenType.Keyword_putc);\r\n        this.keywords.put(\"while\", TokenType.Keyword_while);\r\n\r\n    }\r\n    Token follow(char expect, TokenType ifyes, TokenType ifno, int line, int pos) {\r\n        if (getNextChar() == expect) {\r\n            getNextChar();\r\n            return new Token(ifyes, \"\", line, pos);\r\n        }\r\n        if (ifno == TokenType.End_of_input) {\r\n            error(line, pos, String.format(\"follow: unrecognized character: (%d) '%c'\", (int)this.chr, this.chr));\r\n        }\r\n        return new Token(ifno, \"\", line, pos);\r\n    }\r\n    Token char_lit(int line, int pos) { // handle character literals\r\n        char c = getNextChar(); // skip opening quote\r\n        int n = (int)c;\r\n        // code here\r\n        return new Token(TokenType.Integer, \"\" + n, line, pos);\r\n    }\r\n    Token string_lit(char start, int line, int pos) { // handle string literals\r\n        String result = \"\";\r\n        // code here\r\n        return new Token(TokenType.String, result, line, pos);\r\n    }\r\n    Token div_or_comment(int line, int pos) { // handle division or comments\r\n        // code here\r\n        return getToken();\r\n    }\r\n    Token identifier_or_integer(int line, int pos) { // handle identifiers and integers\r\n        boolean is_number = true;\r\n        String text = \"\";\r\n        // code here\r\n        return new Token(TokenType.Identifier, text, line, pos);\r\n    }\r\n    Token getToken() {\r\n        int line, pos;\r\n        while (Character.isWhitespace(this.chr)) {\r\n            getNextChar();\r\n        }\r\n        line = this.line;\r\n        pos = this.pos;\r\n\r\n        // switch statement on character for all forms of tokens with return to follow.... one example left for you\r\n\r\n        switch (this.chr) {\r\n            case '\\u0000': return new Token(TokenType.End_of_input, \"\", this.line, this.pos);\r\n            // remaining case statements\r\n\r\n            default: return identifier_or_integer(line, pos);\r\n        }\r\n    }\r\n\r\n    char getNextChar() {\r\n        this.pos++;\r\n        this.position++;\r\n        if (this.position >= this.s.length()) {\r\n            this.chr = '\\u0000';\r\n            return this.chr;\r\n        }\r\n        this.chr = this.s.charAt(this.position);\r\n        if (this.chr == '\\n') {\r\n            this.line++;\r\n            this.pos = 0;\r\n        }\r\n        return this.chr;\r\n    }\r\n\r\n    String printTokens() {\r\n        Token t;\r\n        StringBuilder sb = new StringBuilder();\r\n        while ((t = getToken()).tokentype != TokenType.End_of_input) {\r\n            sb.append(t);\r\n            sb.append(\"\\n\");\r\n            System.out.println(t);\r\n        }\r\n        sb.append(t);\r\n        System.out.println(t);\r\n        return sb.toString();\r\n    }\r\n\r\n    static void outputToFile(String result) {\r\n        try {\r\n            FileWriter myWriter = new FileWriter(\"src/main/resources/hello.lex\");\r\n            myWriter.write(result);\r\n            myWriter.close();\r\n            System.out.println(\"Successfully wrote to the file.\");\r\n        } catch (IOException e) {\r\n            throw new RuntimeException(e);\r\n        }\r\n    }\r\n\r\n    public static void main(String[] args) {\r\n        if (1==1) {\r\n            try {\r\n\r\n                File f = new File(\"src/main/resources/count.c\");\r\n                Scanner s = new Scanner(f);\r\n                String source = \" \";\r\n                String result = \" \";\r\n                while (s.hasNext()) {\r\n                    source += s.nextLine() + \"\\n\";\r\n                }\r\n                Lexer l = new Lexer(source);\r\n                result = l.printTokens();\r\n\r\n                outputToFile(result);\r\n\r\n            } catch(FileNotFoundException e) {\r\n                error(-1, -1, \"Exception: \" + e.getMessage());\r\n            }\r\n        } else {\r\n            error(-1, -1, \"No args\");\r\n        }\r\n    }\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/Lexer.java b/src/main/java/Lexer.java
+--- a/src/main/java/Lexer.java	(revision 219c673ced497d4f759d1bff44dba2ba19356241)
++++ b/src/main/java/Lexer.java	(date 1714196799894)
+@@ -150,7 +150,7 @@
+ 
+     static void outputToFile(String result) {
+         try {
+-            FileWriter myWriter = new FileWriter("src/main/resources/hello.lex");
++            FileWriter myWriter = new FileWriter("src/main/resources/hello1.lex");
+             myWriter.write(result);
+             myWriter.close();
+             System.out.println("Successfully wrote to the file.");
+@@ -163,7 +163,7 @@
+         if (1==1) {
+             try {
+ 
+-                File f = new File("src/main/resources/count.c");
++                File f = new File("src/main/resources/fizzbuzz.c");
+                 Scanner s = new Scanner(f);
+                 String source = " ";
+                 String result = " ";
+Index: src/main/resources/test1.lex
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/resources/test1.lex b/src/main/resources/test1.lex
+new file mode 100644
+--- /dev/null	(date 1714164692216)
++++ b/src/main/resources/test1.lex	(date 1714164692216)
+@@ -0,0 +1,5 @@
++1       1 Identifier count
++1       7 Op_assign
++1       9 Integer       1
++1       25 Semicolon
++1       1 End_of_input
+\ No newline at end of file
+Index: .idea/workspace.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<project version=\"4\">\r\n  <component name=\"AutoImportSettings\">\r\n    <option name=\"autoReloadType\" value=\"SELECTIVE\" />\r\n  </component>\r\n  <component name=\"ChangeListManager\">\r\n    <list default=\"true\" id=\"a7ac25b6-265d-43ed-8230-0c6749f7127e\" name=\"Changes\" comment=\"New commit with added getNextToken() code\">\r\n      <change beforePath=\"$PROJECT_DIR$/.idea/misc.xml\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/.idea/misc.xml\" afterDir=\"false\" />\r\n      <change beforePath=\"$PROJECT_DIR$/.idea/workspace.xml\" beforeDir=\"false\" afterPath=\"$PROJECT_DIR$/.idea/workspace.xml\" afterDir=\"false\" />\r\n    </list>\r\n    <option name=\"SHOW_DIALOG\" value=\"false\" />\r\n    <option name=\"HIGHLIGHT_CONFLICTS\" value=\"true\" />\r\n    <option name=\"HIGHLIGHT_NON_ACTIVE_CHANGELIST\" value=\"false\" />\r\n    <option name=\"LAST_RESOLUTION\" value=\"IGNORE\" />\r\n  </component>\r\n  <component name=\"ExternalProjectsData\">\r\n    <projectState path=\"$PROJECT_DIR$\">\r\n      <ProjectState />\r\n    </projectState>\r\n  </component>\r\n  <component name=\"ExternalProjectsManager\">\r\n    <system id=\"GRADLE\">\r\n      <state>\r\n        <projects_view>\r\n          <tree_state>\r\n            <expand>\r\n              <path>\r\n                <item name=\"\" type=\"6a2764b6:ExternalProjectsStructure$RootNode\" />\r\n                <item name=\"MiniCompiler\" type=\"f1a62948:ProjectNode\" />\r\n              </path>\r\n            </expand>\r\n            <select />\r\n          </tree_state>\r\n        </projects_view>\r\n      </state>\r\n    </system>\r\n  </component>\r\n  <component name=\"FileTemplateManagerImpl\">\r\n    <option name=\"RECENT_TEMPLATES\">\r\n      <list>\r\n        <option value=\"JUnit5 Test Class\" />\r\n        <option value=\"Class\" />\r\n      </list>\r\n    </option>\r\n  </component>\r\n  <component name=\"Git.Settings\">\r\n    <option name=\"RECENT_BRANCH_BY_REPOSITORY\">\r\n      <map>\r\n        <entry key=\"$PROJECT_DIR$\" value=\"main\" />\r\n      </map>\r\n    </option>\r\n    <option name=\"RECENT_GIT_ROOT_PATH\" value=\"$PROJECT_DIR$\" />\r\n  </component>\r\n  <component name=\"GitHubPullRequestSearchHistory\"><![CDATA[{\r\n  \"lastFilter\": {\r\n    \"state\": \"OPEN\",\r\n    \"assignee\": \"jjemi8884\"\r\n  }\r\n}]]></component>\r\n  <component name=\"GithubPullRequestsUISettings\"><![CDATA[{\r\n  \"selectedUrlAndAccountId\": {\r\n    \"url\": \"https://github.com/jjemi8884/CSB310_Mini-Compiler\",\r\n    \"accountId\": \"e452ae38-d731-4fe8-9029-458a87a7fe7c\"\r\n  }\r\n}]]></component>\r\n  <component name=\"MarkdownSettingsMigration\">\r\n    <option name=\"stateVersion\" value=\"1\" />\r\n  </component>\r\n  <component name=\"ProjectColorInfo\">{\r\n  &quot;associatedIndex&quot;: 7\r\n}</component>\r\n  <component name=\"ProjectId\" id=\"2MfWaxIGvCC8fsmB46pvouU9vkq\" />\r\n  <component name=\"ProjectLevelVcsManager\" settingsEditedManually=\"true\" />\r\n  <component name=\"ProjectViewState\">\r\n    <option name=\"hideEmptyMiddlePackages\" value=\"true\" />\r\n    <option name=\"showLibraryContents\" value=\"true\" />\r\n  </component>\r\n  <component name=\"PropertiesComponent\"><![CDATA[{\r\n  \"keyToString\": {\r\n    \"Gradle.CSB310_Mini-Compiler [:Lexer.main()].executor\": \"Run\",\r\n    \"RunOnceActivity.ShowReadmeOnStart\": \"true\",\r\n    \"SHARE_PROJECT_CONFIGURATION_FILES\": \"true\",\r\n    \"WebServerToolWindowFactoryState\": \"false\",\r\n    \"com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary\": \"JUnit5\",\r\n    \"com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit5\": \"\",\r\n    \"git-widget-placeholder\": \"parcer\",\r\n    \"ignore.virus.scanning.warn.message\": \"true\",\r\n    \"kotlin-language-version-configured\": \"true\",\r\n    \"last_opened_file_path\": \"C:/Users/jjemi/Documents/CSB310/CSB310_Mini-Compiler\",\r\n    \"node.js.detected.package.eslint\": \"true\",\r\n    \"node.js.detected.package.tslint\": \"true\",\r\n    \"node.js.selected.package.eslint\": \"(autodetect)\",\r\n    \"node.js.selected.package.tslint\": \"(autodetect)\",\r\n    \"settings.editor.selected.configurable\": \"reference.settingsdialog.project.gradle\",\r\n    \"vue.rearranger.settings.migration\": \"true\"\r\n  }\r\n}]]></component>\r\n  <component name=\"RecentsManager\">\r\n    <key name=\"CopyFile.RECENT_KEYS\">\r\n      <recent name=\"$PROJECT_DIR$/src/main/resources\" />\r\n    </key>\r\n    <key name=\"MoveFile.RECENT_KEYS\">\r\n      <recent name=\"$PROJECT_DIR$/src/main/resources\" />\r\n    </key>\r\n    <key name=\"CreateTestDialog.Recents.Supers\">\r\n      <recent name=\"\" />\r\n    </key>\r\n    <key name=\"CreateTestDialog.RecentsKey\">\r\n      <recent name=\"\" />\r\n    </key>\r\n  </component>\r\n  <component name=\"RunManager\" selected=\"Application.Lexer\">\r\n    <configuration name=\"Lexer\" type=\"Application\" factoryName=\"Application\" temporary=\"true\" nameIsGenerated=\"true\">\r\n      <option name=\"MAIN_CLASS_NAME\" value=\"Lexer\" />\r\n      <module name=\"MiniCompiler.main\" />\r\n      <method v=\"2\">\r\n        <option name=\"Make\" enabled=\"true\" />\r\n      </method>\r\n    </configuration>\r\n    <configuration name=\"Parser\" type=\"Application\" factoryName=\"Application\" temporary=\"true\" nameIsGenerated=\"true\">\r\n      <option name=\"MAIN_CLASS_NAME\" value=\"Parser\" />\r\n      <module name=\"MiniCompiler.main\" />\r\n      <method v=\"2\">\r\n        <option name=\"Make\" enabled=\"true\" />\r\n      </method>\r\n    </configuration>\r\n    <recent_temporary>\r\n      <list>\r\n        <item itemvalue=\"Application.Parser\" />\r\n        <item itemvalue=\"Application.Lexer\" />\r\n      </list>\r\n    </recent_temporary>\r\n  </component>\r\n  <component name=\"SpellCheckerSettings\" RuntimeDictionaries=\"0\" Folders=\"0\" CustomDictionaries=\"0\" DefaultDictionary=\"application-level\" UseSingleDictionary=\"true\" transferred=\"true\" />\r\n  <component name=\"TaskManager\">\r\n    <task active=\"true\" id=\"Default\" summary=\"Default task\">\r\n      <changelist id=\"a7ac25b6-265d-43ed-8230-0c6749f7127e\" name=\"Changes\" comment=\"\" />\r\n      <created>1678159185811</created>\r\n      <option name=\"number\" value=\"Default\" />\r\n      <option name=\"presentableId\" value=\"Default\" />\r\n      <updated>1678159185811</updated>\r\n      <workItem from=\"1682634037926\" duration=\"218000\" />\r\n      <workItem from=\"1683141564295\" duration=\"383000\" />\r\n      <workItem from=\"1712181068433\" duration=\"206000\" />\r\n    </task>\r\n    <task id=\"LOCAL-00001\" summary=\"Initial commit, incomplete solution\">\r\n      <created>1678238319702</created>\r\n      <option name=\"number\" value=\"00001\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00001\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1678238319702</updated>\r\n    </task>\r\n    <task id=\"LOCAL-00002\" summary=\"New commit with added getNextToken() code\">\r\n      <created>1682631009218</created>\r\n      <option name=\"number\" value=\"00002\" />\r\n      <option name=\"presentableId\" value=\"LOCAL-00002\" />\r\n      <option name=\"project\" value=\"LOCAL\" />\r\n      <updated>1682631009218</updated>\r\n    </task>\r\n    <option name=\"localTasksCounter\" value=\"3\" />\r\n    <servers />\r\n  </component>\r\n  <component name=\"TypeScriptGeneratedFilesManager\">\r\n    <option name=\"version\" value=\"3\" />\r\n  </component>\r\n  <component name=\"Vcs.Log.Tabs.Properties\">\r\n    <option name=\"TAB_STATES\">\r\n      <map>\r\n        <entry key=\"MAIN\">\r\n          <value>\r\n            <State>\r\n              <option name=\"FILTERS\">\r\n                <map>\r\n                  <entry key=\"branch\">\r\n                    <value>\r\n                      <list>\r\n                        <option value=\"origin/parcer\" />\r\n                      </list>\r\n                    </value>\r\n                  </entry>\r\n                </map>\r\n              </option>\r\n            </State>\r\n          </value>\r\n        </entry>\r\n      </map>\r\n    </option>\r\n  </component>\r\n  <component name=\"VcsManagerConfiguration\">\r\n    <MESSAGE value=\"Initial commit, incomplete solution\" />\r\n    <MESSAGE value=\"New commit with added getNextToken() code\" />\r\n    <option name=\"LAST_COMMIT_MESSAGE\" value=\"New commit with added getNextToken() code\" />\r\n  </component>\r\n  <component name=\"XDebuggerManager\">\r\n    <breakpoint-manager>\r\n      <breakpoints>\r\n        <line-breakpoint enabled=\"true\" type=\"java-field\">\r\n          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>\r\n          <line>17</line>\r\n          <properties field=\"nt\" class=\"Parser.Node\" />\r\n          <option name=\"timeStamp\" value=\"1\" />\r\n        </line-breakpoint>\r\n        <line-breakpoint enabled=\"true\" type=\"java-field\">\r\n          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>\r\n          <line>45</line>\r\n          <properties field=\"tokentype\" class=\"Parser.Token\" />\r\n          <option name=\"timeStamp\" value=\"2\" />\r\n        </line-breakpoint>\r\n        <line-breakpoint enabled=\"true\" type=\"java-field\">\r\n          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>\r\n          <line>112</line>\r\n          <properties field=\"nd_None\" class=\"Parser.NodeType\" />\r\n          <option name=\"timeStamp\" value=\"7\" />\r\n        </line-breakpoint>\r\n        <line-breakpoint enabled=\"true\" type=\"java-line\">\r\n          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>\r\n          <line>59</line>\r\n          <option name=\"timeStamp\" value=\"9\" />\r\n        </line-breakpoint>\r\n      </breakpoints>\r\n    </breakpoint-manager>\r\n    <pin-to-top-manager>\r\n      <pinned-members>\r\n        <PinnedItemInfo parentTag=\"Lexer\" memberName=\"position\" />\r\n      </pinned-members>\r\n    </pin-to-top-manager>\r\n  </component>\r\n  <component name=\"XSLT-Support.FileAssociations.UIState\">\r\n    <expand />\r\n    <select />\r\n  </component>\r\n</project>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+--- a/.idea/workspace.xml	(revision 219c673ced497d4f759d1bff44dba2ba19356241)
++++ b/.idea/workspace.xml	(date 1714195992611)
+@@ -5,8 +5,9 @@
+   </component>
+   <component name="ChangeListManager">
+     <list default="true" id="a7ac25b6-265d-43ed-8230-0c6749f7127e" name="Changes" comment="New commit with added getNextToken() code">
+-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
++      <change afterPath="$PROJECT_DIR$/src/main/resources/test1.lex" afterDir="false" />
+       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
++      <change beforePath="$PROJECT_DIR$/src/main/java/Parser.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/Parser.java" afterDir="false" />
+     </list>
+     <option name="SHOW_DIALOG" value="false" />
+     <option name="HIGHLIGHT_CONFLICTS" value="true" />
+@@ -51,18 +52,18 @@
+     </option>
+     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+   </component>
+-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+-  "lastFilter": {
+-    "state": "OPEN",
+-    "assignee": "jjemi8884"
++  <component name="GitHubPullRequestSearchHistory">{
++  &quot;lastFilter&quot;: {
++    &quot;state&quot;: &quot;OPEN&quot;,
++    &quot;assignee&quot;: &quot;jjemi8884&quot;
+   }
+-}]]></component>
+-  <component name="GithubPullRequestsUISettings"><![CDATA[{
+-  "selectedUrlAndAccountId": {
+-    "url": "https://github.com/jjemi8884/CSB310_Mini-Compiler",
+-    "accountId": "e452ae38-d731-4fe8-9029-458a87a7fe7c"
++}</component>
++  <component name="GithubPullRequestsUISettings">{
++  &quot;selectedUrlAndAccountId&quot;: {
++    &quot;url&quot;: &quot;https://github.com/jjemi8884/CSB310_Mini-Compiler&quot;,
++    &quot;accountId&quot;: &quot;e452ae38-d731-4fe8-9029-458a87a7fe7c&quot;
+   }
+-}]]></component>
++}</component>
+   <component name="MarkdownSettingsMigration">
+     <option name="stateVersion" value="1" />
+   </component>
+@@ -75,26 +76,26 @@
+     <option name="hideEmptyMiddlePackages" value="true" />
+     <option name="showLibraryContents" value="true" />
+   </component>
+-  <component name="PropertiesComponent"><![CDATA[{
+-  "keyToString": {
+-    "Gradle.CSB310_Mini-Compiler [:Lexer.main()].executor": "Run",
+-    "RunOnceActivity.ShowReadmeOnStart": "true",
+-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+-    "WebServerToolWindowFactoryState": "false",
+-    "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary": "JUnit5",
+-    "com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit5": "",
+-    "git-widget-placeholder": "parcer",
+-    "ignore.virus.scanning.warn.message": "true",
+-    "kotlin-language-version-configured": "true",
+-    "last_opened_file_path": "C:/Users/jjemi/Documents/CSB310/CSB310_Mini-Compiler",
+-    "node.js.detected.package.eslint": "true",
+-    "node.js.detected.package.tslint": "true",
+-    "node.js.selected.package.eslint": "(autodetect)",
+-    "node.js.selected.package.tslint": "(autodetect)",
+-    "settings.editor.selected.configurable": "reference.settingsdialog.project.gradle",
+-    "vue.rearranger.settings.migration": "true"
++  <component name="PropertiesComponent">{
++  &quot;keyToString&quot;: {
++    &quot;Gradle.CSB310_Mini-Compiler [:Lexer.main()].executor&quot;: &quot;Run&quot;,
++    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
++    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
++    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
++    &quot;com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrary&quot;: &quot;JUnit5&quot;,
++    &quot;com.intellij.testIntegration.createTest.CreateTestDialog.defaultLibrarySuperClass.JUnit5&quot;: &quot;&quot;,
++    &quot;git-widget-placeholder&quot;: &quot;parcer&quot;,
++    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
++    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
++    &quot;last_opened_file_path&quot;: &quot;C:/Users/jjemi/Documents/CSB310/CSB310_Mini-Compiler&quot;,
++    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
++    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
++    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
++    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
++    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settingsdialog.project.gradle&quot;,
++    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+   }
+-}]]></component>
++}</component>
+   <component name="RecentsManager">
+     <key name="CopyFile.RECENT_KEYS">
+       <recent name="$PROJECT_DIR$/src/main/resources" />
+@@ -109,7 +110,7 @@
+       <recent name="" />
+     </key>
+   </component>
+-  <component name="RunManager" selected="Application.Lexer">
++  <component name="RunManager" selected="Application.Parser">
+     <configuration name="Lexer" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+       <option name="MAIN_CLASS_NAME" value="Lexer" />
+       <module name="MiniCompiler.main" />
+@@ -142,6 +143,7 @@
+       <workItem from="1682634037926" duration="218000" />
+       <workItem from="1683141564295" duration="383000" />
+       <workItem from="1712181068433" duration="206000" />
++      <workItem from="1714161863839" duration="13564000" />
+     </task>
+     <task id="LOCAL-00001" summary="Initial commit, incomplete solution">
+       <created>1678238319702</created>
+@@ -194,28 +196,10 @@
+   <component name="XDebuggerManager">
+     <breakpoint-manager>
+       <breakpoints>
+-        <line-breakpoint enabled="true" type="java-field">
+-          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>
+-          <line>17</line>
+-          <properties field="nt" class="Parser.Node" />
+-          <option name="timeStamp" value="1" />
+-        </line-breakpoint>
+-        <line-breakpoint enabled="true" type="java-field">
+-          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>
+-          <line>45</line>
+-          <properties field="tokentype" class="Parser.Token" />
+-          <option name="timeStamp" value="2" />
+-        </line-breakpoint>
+-        <line-breakpoint enabled="true" type="java-field">
+-          <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>
+-          <line>112</line>
+-          <properties field="nd_None" class="Parser.NodeType" />
+-          <option name="timeStamp" value="7" />
+-        </line-breakpoint>
+         <line-breakpoint enabled="true" type="java-line">
+           <url>file://$PROJECT_DIR$/src/main/java/Parser.java</url>
+-          <line>59</line>
+-          <option name="timeStamp" value="9" />
++          <line>166</line>
++          <option name="timeStamp" value="18" />
+         </line-breakpoint>
+       </breakpoints>
+     </breakpoint-manager>
+@@ -229,4 +213,7 @@
+     <expand />
+     <select />
+   </component>
++  <component name="com.intellij.coverage.CoverageDataManagerImpl">
++    <SUITE FILE_PATH="coverage/MiniCompiler$Parser.ic" NAME="Parser Coverage Results" MODIFIED="1713465400802" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="idea" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" />
++  </component>
+ </project>
+\ No newline at end of file

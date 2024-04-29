@@ -1,0 +1,107 @@
+classDiagram
+    class Lexer {
+        -int line
+        -int pos
+        -int position
+        -char chr
+        -String s
+        -Map<String, TokenType> keywords
+        +Lexer(String source)
+        -Token follow(char expect, TokenType ifyes, TokenType ifno, int line, int pos)
+        -Token char_lit(int line, int pos)
+        -Token string_lit(char start, int line, int pos)
+        -Token div_or_comment(int line, int pos)
+        -Token identifier_or_integer(int line, int pos)
+        +Token getToken()
+        -char getNextChar()
+        +String printTokens()
+    }
+
+    class Lexer.Token {
+        +TokenType tokentype
+        +String value
+        +int line
+        +int pos
+        +Token(TokenType token, String value, int line, int pos)
+        +String toString()
+    }
+
+    class Lexer.TokenType {
+        <<enumeration>>
+        End_of_input
+        Op_multiply
+        Op_divide
+        ...
+    }
+
+    class Parser {
+        -List<Token> source
+        -Token token
+        -int position
+        +Parser(List<Token> source)
+        -Token getNextToken()
+        -Node expr(int p)
+        -Node paren_expr()
+        -void expect(String msg, TokenType s)
+        -Node stmt()
+        +Node parse()
+        +String printAST(Node t, StringBuilder sb)
+    }
+
+    class Parser.Node {
+        +NodeType nt
+        +Node left
+        +Node right
+        +String value
+        +Node()
+        +Node(NodeType node_type, Node left, Node right, String value)
+        +static Node make_node(NodeType nodetype, Node left, Node right)
+        +static Node make_node(NodeType nodetype, Node left)
+        +static Node make_leaf(NodeType nodetype, String value)
+    }
+
+    class Parser.Token {
+        +TokenType tokentype
+        +String value
+        +int line
+        +int pos
+        +Token(TokenType token, String value, int line, int pos)
+        +String toString()
+    }
+
+    class Parser.TokenType {
+        <<enumeration>>
+        End_of_input
+        Op_multiply
+        Op_divide
+        ...
+        -int precedence
+        -boolean right_assoc
+        -boolean is_binary
+        -boolean is_unary
+        -NodeType node_type
+        +TokenType(boolean right_assoc, boolean is_binary, boolean is_unary, int precedence, NodeType node)
+        +boolean isRightAssoc()
+        +boolean isBinary()
+        +boolean isUnary()
+        +int getPrecedence()
+        +NodeType getNodeType()
+    }
+
+    class Parser.NodeType {
+        <<enumeration>>
+        nd_None
+        nd_Ident
+        nd_String
+        ...
+        -String name
+        +NodeType(String name)
+        +String toString()
+    }
+
+    Lexer +-- Lexer.Token
+    Lexer +-- Lexer.TokenType
+    Parser +-- Parser.Node
+    Parser +-- Parser.Token
+    Parser +-- Parser.TokenType
+    Parser +-- Parser.NodeType

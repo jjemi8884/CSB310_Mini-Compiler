@@ -635,7 +635,7 @@ class Parser {
                 List<Token> list = new ArrayList<>();
                 Map<String, TokenType> str_to_tokens =  createHashMap();
 
-                Scanner s = new Scanner(new File("src/main/resources/ifTest.lex"));
+                Scanner s = new Scanner(new File("src/main/resources/count.lex"));
                 String source = " ";
                 while (s.hasNext()) {
                     String str = s.nextLine();
