@@ -154,6 +154,7 @@ public class Lexer {
         } else {
             return new Token(TokenType.Identifier, text, line, pos);
         }
+        return null;
     }
 
     Token getToken() {
@@ -218,7 +219,7 @@ public class Lexer {
 
     static void outputToFile(String result) {
         try {
-            FileWriter myWriter = new FileWriter("src/main/resources/hello.lex");
+            FileWriter myWriter = new FileWriter("src/main/resources/hello1.lex");
             myWriter.write(result);
             myWriter.close();
             System.out.println("Successfully wrote to the file.");
@@ -231,7 +232,7 @@ public class Lexer {
         if (1==1) {
             try {
 
-                File f = new File("src/main/resources/count.c");
+                File f = new File("src/main/resources/fizzbuzz.c");
                 Scanner s = new Scanner(f);
                 String source = " ";
                 String result = " ";

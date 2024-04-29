@@ -104,4 +104,3 @@ classDiagram
     Parser +-- Parser.Node
     Parser +-- Parser.Token
     Parser +-- Parser.TokenType
-    Parser +-- Parser.NodeType
