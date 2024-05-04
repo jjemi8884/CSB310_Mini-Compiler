@@ -194,7 +194,7 @@ class Parser {
         String(false, false, false, -1, NodeType.nd_String);
 
         /**
-         * What precedence level is the token in regards to mathmatical equations
+         * What precedence level is the token in regard to mathmatical equations
          */
         private final int precedence;
 
@@ -442,6 +442,17 @@ class Parser {
 
         return t;
     }
+
+    /**O(n) where n equals the number of nested functions with in the supplied
+     * code
+     * This Method will be called when the next token is a LeftParen,
+     * And will then call the expression method to map out the expression that will
+     * be located with the ( ), The node returned to be added to the AST tree will be a
+     * node of the expression with no parentheses attached since they are not used in the
+     * compilation of the file. Parentheses are only used for human readability,
+     * not in machine code.
+     * @return the node for the AST tree
+     */
     Node paren_expr() {
         expect("paren_expr", TokenType.LeftParen);
         getNextToken();
@@ -498,15 +509,18 @@ class Parser {
 
         }
 
-        //check for precedence
+        //check for precedence if the next token is of greater precedence than the current token
         while(this.token.tokentype.is_binary && this.token.tokentype.precedence >= p){
             Token temp = this.token;
             getNextToken();
             int q = this.token.tokentype.precedence;
-            if (temp.tokentype.isRightAssoc()){
+            // we don't have any right associate, but if we did then this is
+            // how we can handle that little tidbit
+            if (temp.tokentype.isRightAssoc()) {
                 q += 1;
-                result = Node.make_node(temp.tokentype.node_type, result, expr(q));
-            }//end if
+            }
+            result = Node.make_node(temp.tokentype.node_type, result, expr(q));
+            //end if
         }// end while
         return result;
     }
@@ -572,6 +586,12 @@ class Parser {
         return sb.toString();
     }
 
+    /**
+     * O(1) But depending upon the size of the string, this could vary greatly
+     * The main objective of this method is to create a new file that will then
+     * hold the flattened AST tree.
+     * @param result is a flattened AST tree ready to be written to a file
+     */
     static void outputToFile(String result) {
         try {
             FileWriter myWriter = new FileWriter("src/main/resources/test2.par");
@@ -583,6 +603,12 @@ class Parser {
         }
     }
 
+    /**
+     * O(1)
+     * Creates the Static hashmap that is used to create the tokens in the main file.
+     * that will be used in creating the flattened AST tree.
+     * @return Map object that will have the <Token Name, token type> used
+     */
     static Map<String, TokenType> createHashMap(){
         Map<String, TokenType> str_to_tokens = new HashMap<>();
 
@@ -622,7 +648,13 @@ class Parser {
         return str_to_tokens;
     }//end createMap
 
-
+    /**
+     * O(n^3) where n is number of tokens and m is the depth of parser tree that the parser needs to
+     * transverse to create the tree. Normal time would be OMEGA(n).
+     * Main method for testing the parser without using an exterior main method
+     * No inputs are required.
+     * @param args
+     */
     public static void main(String[] args) {
         if (1==1) {
             try {
