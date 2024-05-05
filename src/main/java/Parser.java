@@ -273,7 +273,7 @@ class Parser {
      * nodes. The only information held is the string name of the token.
      */
     static enum NodeType {
-        nd_None(""), nd_Ident("Identifier"), nd_String("String"), nd_Integer("Integer"), nd_Sequence("Sequence"), nd_If("If"),
+        nd_None(""), nd_Ident("Identifier"), nd_String("String"), nd_Integer("Integer"), nd_Sequence("Sequence"), nd_If("If"), nd_Else("Else"),
         nd_Prtc("Prtc"), nd_Prts("Prts"), nd_Prti("Prti"), nd_While("While"),
         nd_Assign("Assign"), nd_Negate("Negate"), nd_Not("Not"), nd_Mul("Multiply"), nd_Div("Divide"), nd_Mod("Mod"), nd_Add("Add"),
         nd_Sub("Subtract"), nd_Lss("Less"), nd_Leq("LessEqual"),
@@ -378,20 +378,31 @@ class Parser {
                     this.token.tokentype != TokenType.End_of_input) {
                 t = Node.make_node(NodeType.nd_Sequence, t, stmt());
             }//end while
-            getNextToken();
+            if(this.token.tokentype != TokenType.End_of_input ) {
+                getNextToken();
+            }
 
 
         }else if (this.token.tokentype == TokenType.Keyword_if) {
             getNextToken();
             e = paren_expr();
             s = stmt();
-            Node el= stmt();
+            Node ifelse = null;
             if(this.token.tokentype == TokenType.Keyword_else){
-                el = stmt();
-            }//end if
+                getNextToken();
+                ifelse = stmt();
+            }
+            t = Node.make_node(NodeType.nd_If, e, Node.make_node(NodeType.nd_If, s, ifelse));
+
+        }else if (this.token.tokentype == TokenType.Keyword_else){
+            getNextToken();
+            e = paren_expr();
+            s = stmt();
+            Node ifelse = null;
+
             //Going to make the inner if statement the true
             //statement and the else statement he left node.
-            t = Node.make_node(NodeType.nd_If, e, Node.make_node(NodeType.nd_If, s, el));
+            t = Node.make_node(NodeType.nd_If, e, Node.make_node(NodeType.nd_If, s,ifelse));
 
         }else if (this.token.tokentype == TokenType.Keyword_print) {
             getNextToken();
@@ -477,8 +488,9 @@ class Parser {
         Node result = null, e, v;
         if(this.token.tokentype.is_binary){
             NodeType n = this.token.tokentype.node_type;
+            int precedence = this.token.tokentype.precedence;
             getNextToken(); //set up right child
-            result = Node.make_node(n, null, expr(0));
+            result = Node.make_node(n, null, expr(precedence));
 
         }else if(this.token.tokentype == TokenType.Integer){
             v = Node.make_leaf(NodeType.nd_Integer, this.token.value);
@@ -506,6 +518,7 @@ class Parser {
             getNextToken();
             result = Node.make_node(temp.tokentype.node_type, expr(0),null);
         } else if(this.token.tokentype == TokenType.LeftParen){
+            result = paren_expr();
 
         }
 
@@ -513,13 +526,13 @@ class Parser {
         while(this.token.tokentype.is_binary && this.token.tokentype.precedence >= p){
             Token temp = this.token;
             getNextToken();
-            int q = this.token.tokentype.precedence;
+            int precedence = this.token.tokentype.precedence;
             // we don't have any right associate, but if we did then this is
             // how we can handle that little tidbit
-            if (temp.tokentype.isRightAssoc()) {
-                q += 1;
+            if (!temp.tokentype.isRightAssoc()) {
+                precedence += 1;
             }
-            result = Node.make_node(temp.tokentype.node_type, result, expr(q));
+            result = Node.make_node(temp.tokentype.node_type, result, expr(precedence));
             //end if
         }// end while
         return result;
@@ -594,7 +607,7 @@ class Parser {
      */
     static void outputToFile(String result) {
         try {
-            FileWriter myWriter = new FileWriter("src/main/resources/test2.par");
+            FileWriter myWriter = new FileWriter("src/main/resources/fizzBuzz.par");
             myWriter.write(result);
             myWriter.close();
             System.out.println("Successfully wrote to the file.");
@@ -649,9 +662,9 @@ class Parser {
     }//end createMap
 
     /**
-     * O(n^3) where n is number of tokens and m is the depth of parser tree that the parser needs to
+     * O(n^3) where n is numbered of tokens and m is the depth of parser tree that the parser needs to
      * transverse to create the tree. Normal time would be OMEGA(n).
-     * Main method for testing the parser without using an exterior main method
+     * Main method for testing the parser without using an exterior main method,
      * No inputs are required.
      * @param args
      */
@@ -667,7 +680,7 @@ class Parser {
                 List<Token> list = new ArrayList<>();
                 Map<String, TokenType> str_to_tokens =  createHashMap();
 
-                Scanner s = new Scanner(new File("src/main/resources/count.lex"));
+                Scanner s = new Scanner(new File("src/main/resources/fizzBuzz.lex"));
                 String source = " ";
                 while (s.hasNext()) {
                     String str = s.nextLine();
