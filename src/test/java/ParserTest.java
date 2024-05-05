@@ -105,7 +105,7 @@ class ParserTest {
 
     @Test
     @DisplayName("Test of the Parser with IsPrime Lex")
-    void testOfTheParserWithIsPrimeLex() throws Exception {
+   void testOfTheParserWithIsPrimeLex() throws Exception {
 
         //get the file
         File f = new File("src/main/resources/isPrime.lex");
@@ -116,7 +116,7 @@ class ParserTest {
         Map<String, Parser.TokenType> stt = Parser.createHashMap();
         List<Parser.Token> tokenList = new ArrayList<>();
         StringBuilder sb = new StringBuilder();
-        Main.updateTokenList(tokenList, stt, lexOut, s);
+        Main.updateTokenList(tokenList, stt,s);
         Parser p = new Parser(tokenList);
         Parser.Node root = p.parse();
         String output = p.printAST(root, sb);
