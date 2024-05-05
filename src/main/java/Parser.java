@@ -483,40 +483,29 @@ class Parser {
      */
     Node expr(int p) {
         // create nodes for token types such as LeftParen, Op_add, Op_subtract, etc.
-        // be very careful here and be aware of the precendence rules for the AST tree
+        // be very careful here and be aware of the precedence rules for the AST tree
 
         Node result = null, e, v;
-        if(this.token.tokentype.is_binary){
+        if(this.token.tokentype == TokenType.Op_add || this.token.tokentype == TokenType.Op_subtract){
             NodeType n = this.token.tokentype.node_type;
             int precedence = this.token.tokentype.precedence;
             getNextToken(); //set up right child
-            result = Node.make_node(n, null, expr(precedence));
+            e = expr(precedence);
+            result = Node.make_node(n, null, e);
 
         }else if(this.token.tokentype == TokenType.Integer){
-            v = Node.make_leaf(NodeType.nd_Integer, this.token.value);
+            result = Node.make_leaf(NodeType.nd_Integer, this.token.value);
             getNextToken();
-            if(this.token.tokentype == TokenType.Semicolon || this.token.tokentype == TokenType.RightParen){
-                result = v;
-            }else{
-                result = expr(this.token.tokentype.precedence);
-                result.left = v;
-            }
 
         } else if(this.token.tokentype == TokenType.Identifier){
-            v = Node.make_leaf(NodeType.nd_Ident, this.token.value);
+            result = Node.make_leaf(NodeType.nd_Ident, this.token.value);
             getNextToken();
-            if(this.token.tokentype == TokenType.Semicolon || this.token.tokentype == TokenType.RightParen
-                               || this.token.tokentype == TokenType.Comma){
-                result = v;
-            }else{
-                result = expr(this.token.tokentype.precedence);
-                result.left = v;
-            }
 
         } else if(this.token.tokentype.is_unary){
             Token temp = this.token;
             getNextToken();
             result = Node.make_node(temp.tokentype.node_type, expr(0),null);
+
         } else if(this.token.tokentype == TokenType.LeftParen){
             result = paren_expr();
 
@@ -524,15 +513,15 @@ class Parser {
 
         //check for precedence if the next token is of greater precedence than the current token
         while(this.token.tokentype.is_binary && this.token.tokentype.precedence >= p){
-            Token temp = this.token;
+            Token b = this.token;
             getNextToken();
-            int precedence = this.token.tokentype.precedence;
-            // we don't have any right associate, but if we did then this is
+            int precedence =b.tokentype.precedence;
+            // we don't have any right associate, but if we did, then this is
             // how we can handle that little tidbit
-            if (!temp.tokentype.isRightAssoc()) {
+            if (!b.tokentype.isRightAssoc()) {
                 precedence += 1;
             }
-            result = Node.make_node(temp.tokentype.node_type, result, expr(precedence));
+            result = Node.make_node(b.tokentype.node_type, result, expr(precedence));
             //end if
         }// end while
         return result;
@@ -605,9 +594,9 @@ class Parser {
      * hold the flattened AST tree.
      * @param result is a flattened AST tree ready to be written to a file
      */
-    static void outputToFile(String result) {
+    static void outputToFile(String result, FileWriter myWriter) {
         try {
-            FileWriter myWriter = new FileWriter("src/main/resources/fizzBuzz.par");
+
             myWriter.write(result);
             myWriter.close();
             System.out.println("Successfully wrote to the file.");
@@ -680,7 +669,7 @@ class Parser {
                 List<Token> list = new ArrayList<>();
                 Map<String, TokenType> str_to_tokens =  createHashMap();
 
-                Scanner s = new Scanner(new File("src/main/resources/fizzBuzz.lex"));
+                Scanner s = new Scanner(new File("src/main/resources/ifTest.lex"));
                 String source = " ";
                 while (s.hasNext()) {
                     String str = s.nextLine();
@@ -704,7 +693,8 @@ class Parser {
                 Parser p = new Parser(list);
                 Node parceNode = p.parse();
                 result = p.printAST(parceNode, sb);
-                outputToFile(result);
+                FileWriter myWriter = new FileWriter("src/main/resources/Pretest.par");
+                outputToFile(result, myWriter);
             } catch (FileNotFoundException e) {
                 error(-1, -1, "Exception: " + e.getMessage());
             } catch (Exception e) {
