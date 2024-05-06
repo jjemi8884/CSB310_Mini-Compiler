@@ -6,6 +6,15 @@ public class Main {
 
     static final int lineSpace = 40;
 
+    /**
+     * O(n) Where n is representative of file size.
+     * This main method will run both the lexer and the parser for
+     * .c file. The main will search the resource director to find the
+     * file name that you would like to run and give you a numbered menu that
+     * you can then choose which file to run.
+     * @param args no args are accepted or used.
+     * @throws Exception will throw exception if it cannot find the file you requested.
+     */
     public static void main(String [] args) throws Exception {
         //get the file
         Scanner s = new Scanner(getFile());
@@ -35,6 +44,7 @@ public class Main {
     }
 
     /**
+     * O(1)
      * create the token list for the parser to parse through this is to allow the
      * test to all the other class
      * @param tokenList is the list that will be updated with token types
@@ -49,6 +59,7 @@ public class Main {
 
     }
     /**
+     * O(1)
      * create the token list for the parser to parse through
      * @param tokenList is the list that will be updated with token types
      * @param stt is the map list that will assist in identifying tokens
@@ -87,10 +98,7 @@ public class Main {
         int i = 1;
     }//end getTokenList
 
-    /**
-     * this method will create the list of tokens that will be then parsed by the parser.
-     * @input List object that will go througt the scanner object to list each token
-     */
+
 
     /**
      * O(1)
@@ -112,7 +120,7 @@ public class Main {
     }//end getFile()
 
     /**
-     * o(1)
+     * O(1)
      * will find all .c files in the resources folder that can be lexed and parsed
      * @param cList the list to update with c programs
      * @throws FileNotFoundException yes
@@ -130,6 +138,7 @@ public class Main {
     }//end updateCList
 
     /**
+     * O(1)
      * THis will allow us to choose some our listed c programs for compiling or select a new program
      * @param br BufferedReader Object
      * @return our integer of choice.
@@ -162,7 +171,7 @@ public class Main {
         return fullFileName;
     }
 
-    /**
+    /**O(1)
      * the method to print to the console with a space afterwards
      * @param text the test used in the print
      */
@@ -172,6 +181,7 @@ public class Main {
     }
 
     /**
+     * O(1)
      * used to print the welcome message with some lines
      * @param text used in the welcome message
      */
