@@ -2,7 +2,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
-
+/**
+ * Done by Mycole Brown
+ * O(Test)
+ * Constructor for the LexerTest class. Initializes the lexerTest's state and sets up the keyword map.
+ * @param "source" the string to be tokenized by the lexer
+ */
 class LexerTest {
     @Test
     @DisplayName("semicolon in case switch")
