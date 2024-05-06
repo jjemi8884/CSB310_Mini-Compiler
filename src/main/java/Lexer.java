@@ -6,6 +6,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 
+/**
+ * Done by Mycole Brown
+ * O(N)
+ * Constructor for the Lexer class. Initializes the lexer's state and sets up the keyword map.
+ * @param "source" the string to be tokenized by the lexer
+ */
 public class Lexer {
     private int line;
     private int pos;
@@ -55,7 +61,9 @@ public class Lexer {
         LeftBrace, RightBrace, Semicolon, Comma, Identifier, Integer, String
     }
 
-    // A method to handle errors and exit the program.
+    /**
+     * Handles lexical analysis errors by printing an error message and terminating the program.
+     */
     static void error(int line, int pos, String msg) {
         if (line > 0 && pos > 0) {
             System.out.printf("%s in line %d, pos %d\n", msg, line, pos);
