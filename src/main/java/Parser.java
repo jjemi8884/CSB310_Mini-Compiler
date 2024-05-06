@@ -669,7 +669,7 @@ class Parser {
                 List<Token> list = new ArrayList<>();
                 Map<String, TokenType> str_to_tokens =  createHashMap();
 
-                Scanner s = new Scanner(new File("src/main/resources/ifTest.lex"));
+                Scanner s = new Scanner(new File("src/main/resources/count.lex"));
                 String source = " ";
                 while (s.hasNext()) {
                     String str = s.nextLine();
@@ -693,7 +693,7 @@ class Parser {
                 Parser p = new Parser(list);
                 Node parceNode = p.parse();
                 result = p.printAST(parceNode, sb);
-                FileWriter myWriter = new FileWriter("src/main/resources/Pretest.par");
+                FileWriter myWriter = new FileWriter("src/main/resources/count.par");
                 outputToFile(result, myWriter);
             } catch (FileNotFoundException e) {
                 error(-1, -1, "Exception: " + e.getMessage());
